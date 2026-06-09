@@ -2,7 +2,9 @@
 
 A successful refresh-token exchange must rotate the refresh token and prevent reuse of the old token.
 
-## Trace ledger
+This requirement is the source of truth. The entries below are validated implementation traces, not requirement definitions.
+
+## Trace Ledger
 
 - AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
 - AUTH-SESSION-ROTATION/002/examples/refresh-token/src/rotation.js
