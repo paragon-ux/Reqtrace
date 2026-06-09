@@ -1,8 +1,8 @@
 # Reqtrace Docs Patch Summary
 
-This ZIP contains a direct Markdown patch for the Reqtrace demo docs.
+This patch updates the Reqtrace Markdown documentation for MkDocs.
 
-## Updated files
+## Changed files
 
 - `README.md`
 - `docs/index.md`
@@ -16,11 +16,10 @@ This ZIP contains a direct Markdown patch for the Reqtrace demo docs.
 
 - `docs/workflow.md`
 
-## Main changes
+## Main documentation changes
 
-- Made the mandatory ledger pass explicit.
-- Replaced “sub-requirement” language with “implementation ordinal.”
-- Clarified that `@file` remains literal in code and expands only when documented.
-- Added role inference from file path instead of separate hooks.
-- Added duplicate ordinal, rename, semantic replacement, file move, and missing trace edge cases.
-- Added a workflow page with implementation pass, ledger pass, and PR review checklist.
+- Made the mandatory trace-ledger pass more explicit.
+- Clarified that ordinals are implementation ordinals, not sub-requirements.
+- Clarified that code comments keep `@file` literal and documentation ledgers store resolved paths.
+- Added a workflow page for implementation pass, ledger pass, and PR review.
+- Expanded edge cases with paired **Incorrect** and **Correct** examples for duplicate ordinals, hardcoded paths, ledger drift, renames, file moves, generated files, and test/source role inference.

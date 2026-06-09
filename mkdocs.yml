@@ -3,6 +3,7 @@ nav:
   - Home: index.md
   - Concept: concept.md
   - Syntax: syntax.md
+  - Workflow: workflow.md
   - Rules: rules.md
   - Edge Cases: edge-cases.md
   - Example Requirement: requirements.md
