@@ -9,7 +9,7 @@ from collections import defaultdict
 from pathlib import Path
 
 
-EXCLUDED_DIRS = {".git", "node_modules", "dist", "build", "coverage", ".venv"}
+EXCLUDED_DIRS = {".git", "node_modules", "dist", "build", "coverage", ".venv", "site"}
 TRACE_RE = re.compile(r"@reqtrace\s+([A-Z]+(?:-[A-Z]+)*)/([0-9]{3})/@file\b")
 LEDGER_RE = re.compile(r"^\s*-\s+([A-Z]+(?:-[A-Z]+)*)/([0-9]{3})/(\S+)\s*$")
 
