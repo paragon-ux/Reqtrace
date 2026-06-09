@@ -37,13 +37,17 @@ The requirement name remains unchanged. The ordinal is an implementation ordinal
 Reqtrace works with normal repository tools:
 
 ```bash
-grep -R "@reqtrace AUTH-SESSION-ROTATION" .
+grep -R "@reqtrace AUTH-SESSION-ROTAsTION" .
 grep -R "@reqtrace AUTH-SESSION-ROTATION/003" .
 ```
 
 After implementation, the second stage is mandatory: validate every expanded trace against the requirement, then append the validated expanded traces to the requirement documentation's trace ledger.
 
-Reqtrace does not replace your requirements process; it gives implementation work a grep-able return path to whatever requirement process you already use.
+--- 
+
+> ### Reqtrace does not replace your requirements process; it gives implementation work a grep-able return path to whatever requirement process you already use.
+
+--- 
 
 ## Optional Validation
 
