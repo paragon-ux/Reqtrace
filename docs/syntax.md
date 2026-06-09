@@ -1,5 +1,7 @@
 # Syntax
 
+Reqtrace has one code marker and one resolved ledger form.
+
 ## Unresolved Code Handle
 
 Code comments use this form:
@@ -13,6 +15,8 @@ Example:
 ```js
 // @reqtrace AUTH-SESSION-ROTATION/001/@file
 ```
+
+The requirement handle must come from an existing upstream requirement source. The code comment does not define the requirement.
 
 ## Resolved Documentation Trace
 
@@ -31,7 +35,7 @@ AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
 ## Grammar
 
 ```txt
-REQUIREMENT = uppercase words separated by hyphens
+REQUIREMENT = upstream requirement handle, commonly uppercase words separated by hyphens
 ORDINAL     = three digits, starting at 001
 @file       = literal placeholder meaning "this file"
 ```

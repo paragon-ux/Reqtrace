@@ -2,7 +2,7 @@
 
 This page shows how to classify Reqtrace handles without using a custom resolver.
 
-Reqtrace does **not** define, rewrite, split, or supersede requirements. The requirement source remains upstream: a spec, ticket, PRD, documentation page, or other requirements process. This page only describes how Reqtrace handles should appear in code and how resolved traces should appear in a trace ledger.
+Reqtrace does **not** define, rewrite, split, supersede, or interpret requirements. The requirement source remains upstream: a spec, ticket, PRD, documentation page, issue, or SDD artifact. This page only describes how Reqtrace handles should appear in code and how resolved traces should appear in a trace ledger.
 
 A Reqtrace handle in code is always unresolved:
 
@@ -57,7 +57,7 @@ AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
 AUTH-SESSION-ROTATION/002/examples/refresh-token/src/validation.js
 ```
 
-The file path is the same, but the ordinals are different, so the occurrences remain distinct.
+The file path is the same, but the ordinals are different.
 
 ## Same Ordinal Repeated Across Different Files
 
@@ -95,7 +95,7 @@ AUTH-SESSION-ROTATION/002/examples/refresh-token/src/rotation.js
 
 ## Hardcoding the File Path in Code
 
-The code comment must keep `@file` literal. The current file path supplies the expanded location during grep/review/validation.
+The code comment must keep `@file` literal. The current file path supplies the expanded location during grep, review, or validation.
 
 **Incorrect**
 
@@ -124,7 +124,7 @@ Documentation ledgers must contain validated expanded traces, not unresolved cod
 **Incorrect**
 
 ```md
-## Trace ledger
+## Trace Ledger
 
 - AUTH-SESSION-ROTATION/001/@file
 ```
@@ -132,18 +132,18 @@ Documentation ledgers must contain validated expanded traces, not unresolved cod
 **Correct**
 
 ```md
-## Trace ledger
+## Trace Ledger
 
 - AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
 ```
 
-## Requirement Handle Rename
+## Upstream Requirement Handle Changes
 
-Reqtrace can follow a requirement handle rename when the upstream requirement process has already decided that the requirement identity is unchanged. Reqtrace does not decide whether the rename is valid.
+If the upstream requirement source changes a requirement handle, update unresolved code handles and resolved ledger entries together. Reqtrace does not decide whether the handle change is valid; it only keeps traces mechanically consistent with the upstream handle.
 
 **Incorrect**
 
-Only renaming code comments and leaving the ledger stale:
+Only updating code comments and leaving the ledger stale:
 
 ```txt
 Code:   @reqtrace AUTH-REFRESH-TOKEN-ROTATION/001/@file
@@ -152,7 +152,7 @@ Ledger: AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
 
 **Correct**
 
-Rename unresolved code handles and resolved ledger entries together:
+Update unresolved code handles and resolved ledger entries together:
 
 ```txt
 Code:   @reqtrace AUTH-REFRESH-TOKEN-ROTATION/001/@file
@@ -166,13 +166,13 @@ grep -R "AUTH-SESSION-ROTATION" .
 grep -R "AUTH-REFRESH-TOKEN-ROTATION" .
 ```
 
-## Requirement Meaning Changes
+## Requirement Meaning Questions
 
-If the requirement meaning changes, handle changes must follow the upstream requirement source. Reqtrace should not hide semantic changes by silently rewriting trace handles.
+Reqtrace should not hide uncertainty about requirement meaning. If a code change appears to depend on a new, changed, or different requirement, the upstream requirement process must provide the handle to use.
 
 **Incorrect**
 
-A trace handle is rewritten to a new requirement name without any matching upstream requirement update or review note:
+A trace handle is rewritten to a different requirement name without an upstream requirement handle or review decision:
 
 ```txt
 AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
@@ -186,15 +186,15 @@ AUTH-DEVICE-BOUND-ROTATION/001/examples/refresh-token/src/validation.js
 
 **Correct**
 
-Keep Reqtrace mechanical: update trace handles only after the upstream requirement source or PR review identifies the new requirement handle to use.
+Keep Reqtrace mechanical. Use the requirement handle supplied by the upstream requirement source or PR review:
 
 ```txt
-Upstream requirement source: AUTH-DEVICE-BOUND-ROTATION
-Code handle:                 @reqtrace AUTH-DEVICE-BOUND-ROTATION/001/@file
-Ledger entry:                AUTH-DEVICE-BOUND-ROTATION/001/examples/refresh-token/src/device-binding.js
+Upstream handle: AUTH-DEVICE-BOUND-ROTATION
+Code:            @reqtrace AUTH-DEVICE-BOUND-ROTATION/001/@file
+Ledger:          AUTH-DEVICE-BOUND-ROTATION/001/examples/refresh-token/src/device-binding.js
 ```
 
-The requirement process owns the semantic decision. Reqtrace only records implementation evidence against the chosen handle.
+Reqtrace records implementation evidence against the chosen handle. It does not choose the handle.
 
 ## File Rename or Move
 
@@ -253,7 +253,7 @@ coverage/
 
 ## Tests and Source Files
 
-Reqtrace uses one hook. Do not add separate hook names for implementation, verification, or support. Role is inferred from the file path and surrounding code.
+Reqtrace uses one hook. Do not add separate hook names for implementation, verification, or support. Role is inferred from the path and surrounding code.
 
 **Incorrect**
 
@@ -284,7 +284,7 @@ examples/refresh-token/tests/rotation.test.js  verification evidence
 
 ## Ledger Maintenance
 
-Every valid trace must be appended to the requirement's trace ledger, or the trace must be removed.
+Every valid trace must be appended to the requirement's trace ledger, or the unresolved trace must be removed.
 
 **Incorrect**
 
@@ -294,14 +294,14 @@ Code contains:
 // @reqtrace AUTH-SESSION-ROTATION/003/@file
 ```
 
-but `docs/requirements.md` has no resolved trace for it.
+but the requirement documentation has no resolved trace for it.
 
 **Correct**
 
 After validation, append the resolved trace:
 
 ```md
-## Trace ledger
+## Trace Ledger
 
 - AUTH-SESSION-ROTATION/003/examples/refresh-token/src/revocation.js
 ```
@@ -310,7 +310,7 @@ Append-only ledgers are useful for review history. Regenerated ledgers are usefu
 
 ## Missing Trace Review
 
-A behavior-changing pull request does not always need a new trace, but it must make the decision explicit during review.
+A behavior-changing pull request does not always need a new trace, but it should make the trace decision visible during review.
 
 **Incorrect**
 
@@ -324,12 +324,12 @@ The pull request does one of these:
 - adds a new @reqtrace handle and ledger entry
 - updates an existing trace and ledger entry
 - removes an invalid trace and ledger entry
-- states that the change is not related to AUTH-SESSION-ROTATION
+- states that the change does not affect AUTH-SESSION-ROTATION trace evidence
 ```
 
 ## Ordinal Gaps
 
-Ordinals do not have to prove a perfect historical sequence forever. They only need to identify validated implementation occurrences clearly.
+Ordinals do not need to prove a perfect historical sequence forever. They only need to identify validated implementation occurrences clearly.
 
 **Acceptable**
 

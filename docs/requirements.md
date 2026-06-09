@@ -2,7 +2,7 @@
 
 A successful refresh-token exchange must rotate the refresh token and prevent reuse of the old token.
 
-This requirement is the source of truth. The entries below are validated implementation traces, not requirement definitions.
+This requirement is the source of truth for the demo. The entries below are validated implementation traces, not requirement definitions.
 
 ## Trace Ledger
 

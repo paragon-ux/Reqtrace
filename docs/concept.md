@@ -2,7 +2,7 @@
 
 Wiki links and graph servers can create maintenance surfaces. Reverse indexes can become extra state that must be generated, hosted, updated, and trusted.
 
-Reqtrace uses a reserved pattern already searchable by normal repository tools. The codebase carries a fresh self-reference to implementation ordinals, while the requirement document remains the source of truth.
+Reqtrace uses a reserved pattern already searchable by normal repository tools. Code comments carry structural trace handles, while the requirement remains defined by the upstream requirement source.
 
 A Reqtrace handle is a structural reference, not a hyperlink:
 
@@ -13,17 +13,25 @@ A Reqtrace handle is a structural reference, not a hyperlink:
 The handle says:
 
 ```txt
-requirement = AUTH-SESSION-ROTATION
-ordinal = 001
+requirement handle = AUTH-SESSION-ROTATION
+implementation ordinal = 001
 location = this file
 ```
 
-The file path returned by grep supplies the occurrence location. That means the repository itself provides the lookup mechanism.
+The file path returned by grep supplies the occurrence location. The repository itself provides the lookup mechanism.
 
-Pull request agents can validate by grep without custom commands. Optional scripts can prove that the ledger matches the code comments, but the core convention does not depend on a server, daemon, database, or generated graph.
+## Boundary
 
-## Why It Is Not a Requirement System
+Reqtrace is not a requirement system. It does not create requirements, decide whether a requirement should be renamed, or decide whether a requirement has changed meaning.
 
-Reqtrace does not create requirements. It only traces implementation evidence back to an existing requirement handle.
+Reqtrace begins when an upstream process has already supplied a requirement handle. It only records implementation or test evidence against that handle.
 
-The ordinal is not a sub-requirement. It is an implementation ordinal: a numbered occurrence of validated implementation or test evidence under the requirement.
+## Why This Is Useful
+
+A pull request agent, coding agent, or human reviewer can use one grep pattern to find all traces for a requirement family:
+
+```bash
+grep -R "@reqtrace AUTH-SESSION-ROTATION" .
+```
+
+Optional scripts can prove that the trace ledger matches the code comments, but the core convention does not depend on a server, daemon, database, or generated graph.

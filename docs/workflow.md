@@ -1,14 +1,18 @@
 # Workflow
 
-Reqtrace is a two-stage process.
+Reqtrace is a two-stage loop that starts from an existing requirement handle.
 
-## Stage 1: Implementation Pass
+## Before Reqtrace
 
-Start from an existing requirement handle, such as:
+Some upstream process supplies a requirement handle, such as:
 
 ```txt
 AUTH-SESSION-ROTATION
 ```
+
+That process may be a spec, ticket, PRD, issue, SDD toolkit, or documentation page. Reqtrace does not create or judge the requirement.
+
+## Stage 1: Implementation Pass
 
 Implement normally. Near important implementation or test evidence, add unresolved Reqtrace handles:
 
@@ -35,7 +39,7 @@ grep -R "@reqtrace AUTH-SESSION-ROTATION" .
 For each result:
 
 1. Read the surrounding code.
-2. Validate that the occurrence is relevant to the requirement.
+2. Validate that the occurrence is relevant to the existing requirement.
 3. Expand `@file` to the repo-relative file path.
 4. Append the resolved trace to the requirement's trace ledger.
 5. Remove or fix invalid traces.
@@ -58,10 +62,10 @@ A reviewer or PR agent should check:
 
 - Does every new `@reqtrace` handle use an existing requirement handle?
 - Does every ordinal identify one distinct implementation occurrence?
-- Are duplicate ordinals intentional? If not, renumber them.
+- Are duplicate ordinals accidental? If so, renumber or remove them.
 - Does every valid occurrence appear in the trace ledger?
-- Did behavior change without adding or updating traces?
-- Did a requirement meaning change? If yes, do not treat it as a simple rename.
+- Did behavior change in a way that should add, update, or remove trace evidence?
+- Did the upstream requirement handle change? If so, are code handles and ledger entries updated together?
 
 ## Minimal Command Set
 
