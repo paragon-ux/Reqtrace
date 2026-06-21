@@ -2,4 +2,5 @@ site_name: Reqtrace
 nav:
   - Home: index.md
   - Reference: reference.md
-  - Example: requirements.md
+  - Examples: examples.md
+  - Requirements: requirements.md

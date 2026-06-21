@@ -36,3 +36,46 @@ For moved files, run `generate` and `render`; do not edit the ledger manually.
 ## Self-Tracing
 
 Reqtrace traces its own implementation as a case study. Generated occurrence IDs and positional diffs show evidence location only; they do not validate requirement meaning.
+
+## Document Hierarchy Enforcement
+
+When `doc_hierarchy` is set in `.reqtrace.json` (e.g.
+`["BRD", "ARD", "DRD", "TRD"]`), `check` enforces two additional rules on
+`implementation`-kind records:
+
+**`E_OFFLEAF_HANDLE`** - fires when an implementation annotation's handle
+prefix is not the last entry in `doc_hierarchy`. Implementation code must
+trace to the leaf document only.
+
+```
+E_OFFLEAF_HANDLE BRD-1 at src/widget.py:4 (expected leaf: TRD)
+```
+
+**`E_MULTI_HANDLE_EVIDENCE`** - fires when two or more consecutive
+implementation annotations in the same file reference different handles
+(gap between line numbers ≤ 1). Each evidence block must name exactly one
+handle.
+
+```
+E_MULTI_HANDLE_EVIDENCE src/widget.py:10-11 has 2 handles: TRD-4, TRD-5
+```
+
+Both rules fire regardless of `--strict` level. An empty `doc_hierarchy`
+list disables enforcement entirely.
+
+## Registry Source Validation
+
+`check --strict=full` also validates that every registry entry with a
+`source` field points to a file that exists on disk.
+
+**`E_REGISTRY_SOURCE_MISSING`** - fires when a registry entry's `source`
+path does not resolve to a real file relative to the project root. Entries
+with no `source` field are exempt.
+
+```
+E_REGISTRY_SOURCE_MISSING TRD-99 (source: docs/missing.md not found)
+```
+
+Fix by updating the `source` field in `docs/handle-registry.jsonl` to a
+file that exists, or by removing the `source` field if the handle has no
+authoritative document yet.
