@@ -1,37 +1,22 @@
 # Concept
 
-Wiki links and graph servers can create maintenance surfaces. Reverse indexes can become extra state that must be generated, hosted, updated, and trusted.
-
-Reqtrace uses a reserved pattern already searchable by normal repository tools. Code comments carry structural trace handles, while the requirement remains defined by the upstream requirement source.
-
-A Reqtrace handle is a structural reference, not a hyperlink:
-
-```txt
-@reqtrace AUTH-SESSION-ROTATION/001/@file
-```
-
-The handle says:
-
-```txt
-requirement handle = AUTH-SESSION-ROTATION
-implementation ordinal = 001
-location = this file
-```
-
-The file path returned by grep supplies the occurrence location. The repository itself provides the lookup mechanism.
+Reqtrace avoids a second system of record. Its source markers travel with code and are always searchable with normal repository tools. Its generated JSONL ledger is deterministic, diffable, and still searchable with `grep`.
 
 ## Boundary
 
-Reqtrace is not a requirement system. It does not create requirements, decide whether a requirement should be renamed, or decide whether a requirement has changed meaning.
+Reqtrace begins only after an upstream source has supplied a handle. It records evidence against that handle; it does not decide what the handle means or whether the evidence is semantically correct. That judgment belongs in code review.
 
-Reqtrace begins when an upstream process has already supplied a requirement handle. It only records implementation or test evidence against that handle.
+## Scope
 
-## Why This Is Useful
+The marker grammar is the same for every handle type. A registry entry identifies the handle's type and source, so adding an ADR or security-control handle never requires a parser change.
 
-A pull request agent, coding agent, or human reviewer can use one grep pattern to find all traces for a requirement family:
+## Why Grep Still Matters
+
+The CLI automates generation, validation, and coverage reporting, but it is not required to find a trace:
 
 ```bash
-grep -R "@reqtrace AUTH-SESSION-ROTATION" .
+grep -R "@reqtrace " .
+grep -R "SEC-CONTROL-7" .
 ```
 
-Optional scripts can prove that the trace ledger matches the code comments, but the core convention does not depend on a server, daemon, database, or generated graph.
+No graph server, database, daemon, or network call is involved.

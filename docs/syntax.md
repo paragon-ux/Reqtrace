@@ -1,83 +1,39 @@
 # Syntax
 
-Reqtrace has one code marker and one resolved ledger form.
-
-## Unresolved Code Handle
-
-Code comments use this form:
+Reqtrace has one code marker:
 
 ```txt
-@reqtrace <REQUIREMENT>/<ORDINAL>/@file
+@reqtrace <handle>
 ```
 
-Example:
+Use one marker per line. The marker is placed near implementation, verification, operational, migration, or documentation evidence; its role is inferred from the configured path map.
 
-```js
-// @reqtrace AUTH-SESSION-ROTATION/001/@file
-```
-
-The requirement handle must come from an existing upstream requirement source. The code comment does not define the requirement.
-
-## Resolved Documentation Trace
-
-Documentation ledgers use the expanded form:
+## Handle Grammar
 
 ```txt
-<REQUIREMENT>/<ORDINAL>/<repo-relative-file-path>
+HANDLE = [A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*
 ```
 
-Example resolved trace:
+This permits handles such as `ADR-0012`, `SEC-CONTROL-7`, and `TRD-12`. The validator is the single implementation of this grammar.
 
-```txt
-AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
+```python
+TRACE_RE = r"@reqtrace\s+([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)\b"
 ```
 
-## Grammar
+There is no ordinal and no file placeholder. The generator derives a short ID from the repo-relative path and 1-indexed line number, then stores a JSONL record containing `handle`, `id`, `path`, `line`, and `kind`.
 
-```txt
-REQUIREMENT = upstream requirement handle, commonly uppercase words separated by hyphens
-ORDINAL     = three digits, starting at 001
-@file       = literal placeholder meaning "this file"
-```
+## Search
 
-Recommended regex:
-
-```regex
-@reqtrace\s+([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)\/([0-9]{3})\/@file
-```
-
-## Expansion Rule
-
-`@file` must remain literal in code comments. It is expanded only when the trace is resolved.
-
-If this comment appears in `examples/refresh-token/src/validation.js`:
-
-```js
-// @reqtrace AUTH-SESSION-ROTATION/001/@file
-```
-
-then the resolved trace is:
-
-```txt
-AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
-```
-
-## Search Levels
-
-Search the whole requirement family:
+Search all annotations:
 
 ```bash
-grep -R "@reqtrace AUTH-SESSION-ROTATION" .
+grep -R "@reqtrace " .
 ```
 
-Search one implementation ordinal:
+Search a known handle:
 
 ```bash
-grep -R "@reqtrace AUTH-SESSION-ROTATION/003" .
+grep -R "$HANDLE" .
 ```
 
-Search all Reqtrace handles:
-
-```bash
-grep -R "@reqtrace" .
-```
+The legacy V1 form is recognized only for migration and deprecation reporting. Configure `legacy_form` as `warn` or `reject` in `.reqtrace.json`.

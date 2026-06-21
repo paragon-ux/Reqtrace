@@ -1,0 +1,22 @@
+{
+  "marker": "@reqtrace",
+  "id_length": 4,
+  "legacy_form": "warn",
+  "excluded_dirs": [".git", "node_modules", "dist", "build", "coverage", ".venv", "site", "V2"],
+  "ledger_path": "docs/trace-ledger.jsonl",
+  "registry_path": "docs/handle-registry.jsonl",
+  "role_map": {
+    "src/**": "implementation",
+    "lib/**": "implementation",
+    "app/**": "implementation",
+    "tests/**": "verification",
+    "spec/**": "verification",
+    "docs/**": "documentation",
+    "migrations/**": "migration",
+    "infra/**": "operational",
+    "deploy/**": "operational",
+    "scripts/**": "implementation",
+    "examples/refresh-token/src/**": "implementation",
+    "examples/refresh-token/tests/**": "verification"
+  }
+}

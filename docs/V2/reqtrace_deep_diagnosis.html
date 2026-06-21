@@ -1,0 +1,358 @@
+
+<style>
+* { box-sizing: border-box; }
+.page { padding: 1.5rem 0; font-family: var(--font-sans); }
+.intro { font-size: 14px; color: var(--color-text-secondary); line-height: 1.65; margin-bottom: 1.5rem; padding-bottom: 1.25rem; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.intro strong { color: var(--color-text-primary); font-weight: 500; }
+.feature { margin-bottom: 1.25rem; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; }
+.feature-head { padding: 1rem 1.25rem; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; user-select: none; }
+.feature-head:hover { background: var(--color-background-secondary); }
+.verdict-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.v-keep   { background: #1D9E75; }
+.v-rework { background: #BA7517; }
+.v-cut    { background: #E24B4A; }
+.v-expand { background: #378ADD; }
+.head-text { flex: 1; min-width: 0; }
+.feat-name { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin: 0 0 2px; }
+.feat-sub  { font-size: 12px; color: var(--color-text-secondary); }
+.verdict-badge { flex-shrink: 0; font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: var(--border-radius-md); }
+.vb-keep   { background:#EAF3DE; color:#3B6D11; }
+.vb-rework { background:#FAEEDA; color:#854F0B; }
+.vb-cut    { background:#FCEBEB; color:#A32D2D; }
+.vb-expand { background:#E6F1FB; color:#185FA5; }
+.feature-body { padding: 0 1.25rem 1.25rem; display: none; }
+.feature-body.open { display: block; }
+.qa-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 1rem; }
+.qa-cell { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; }
+.qa-label { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); margin: 0 0 4px; }
+.qa-text  { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; margin: 0; }
+.diagnosis { font-size: 14px; color: var(--color-text-secondary); line-height: 1.65; margin: 0 0 0.75rem; }
+.rec-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); margin: 0.75rem 0 4px; }
+.rec-box { background: var(--color-background-secondary); border-left: 2px solid var(--color-border-secondary); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; padding: 10px 13px; font-size: 13px; color: var(--color-text-secondary); line-height: 1.55; }
+hr.div { border: none; border-top: 0.5px solid var(--color-border-tertiary); margin: 0.85rem 0; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-secondary); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.expand-hint { font-size: 11px; color: var(--color-text-tertiary); margin-left: auto; }
+.section-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin: 0 0 6px; }
+.roadmap-section { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 0.5px solid var(--color-border-tertiary); }
+@media (max-width: 540px) { .qa-grid { grid-template-columns: 1fr; } }
+@media (prefers-color-scheme: dark) {
+  .vb-keep   { background:#27500A; color:#C0DD97; }
+  .vb-rework { background:#633806; color:#FAC775; }
+  .vb-cut    { background:#791F1F; color:#F7C1C1; }
+  .vb-expand { background:#0C447C; color:#B5D4F4; }
+}
+</style>
+
+<div class="page">
+
+<div class="intro">
+  This is a feature-by-feature diagnosis of <strong>Reqtrace v1</strong> as the predecessor to your current project. Each feature is evaluated on necessity, usability, and whether its value justifies the steps it requires. Click any feature to expand the full analysis. The verdict is a design signal, not a binary judgment.
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1D9E75;"></div> Keep as-is</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#BA7517;"></div> Rework</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#E24B4A;"></div> Cut or make invisible</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#378ADD;"></div> Expand scope</div>
+</div>
+
+<!-- ─── FEATURE 1: @reqtrace annotation ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-keep"></div>
+    <div class="head-text">
+      <p class="feat-name">@reqtrace annotation in source code</p>
+      <span class="feat-sub">The core marker: <code>@reqtrace REQUIREMENT/ORDINAL/@file</code> placed in comments near evidence</span>
+    </div>
+    <span class="verdict-badge vb-keep">Keep</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">Yes. The annotation is the entire foundation. Without it there is nothing to grep, nothing to validate, and no evidence chain. Everything else is scaffolding around this marker.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">Low in practice. Adding a comment line near evidence is the same effort as any other code comment. The syntax is verbose but it is placed once and never touched again unless the requirement changes.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">Very high ratio. One comment makes a code location findable by requirement handle forever, without any tooling, in any editor, by any developer or agent.</p></div>
+    </div>
+    <p class="diagnosis">The annotation is the strongest part of Reqtrace. The design decision to put the marker in a comment rather than structured metadata (YAML frontmatter, sidecar file, external DB) is correct — it travels with the code, survives merges and moves better than any external record, and is immediately readable by both humans and grep. The choice to use <code>@</code> as the prefix is sound: it avoids collisions with language keywords, is recognizable as metadata, and works across every comment syntax.</p>
+    <p class="diagnosis">The one tension is that the annotation is in two forms simultaneously: the unresolved form in code (<code>@file</code>) and the resolved form in the ledger (actual path). This split creates a synchronization requirement that is the root cause of several downstream problems. But that is a ledger design problem, not an annotation problem.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Keep this exactly. It is the most defensible design decision in the project. If anything, the successor product should treat this as the fixed point and redesign everything else around preserving its simplicity.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 2: @file handle ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-cut"></div>
+    <div class="head-text">
+      <p class="feat-name">@file placeholder in the annotation</p>
+      <span class="feat-sub">The abstract placeholder that must be resolved to an actual path at ledger time</span>
+    </div>
+    <span class="verdict-badge vb-cut">Cut or make invisible</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">No. The file path is already known at annotation time — it is the file the developer is editing. <code>@file</code> solves a problem (not knowing the path) that does not exist for a human writer, and creates a problem (deferred resolution) that did not exist before.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">High, disproportionately so. It introduces a two-state annotation (unresolved / resolved), requires a ledger pass to complete, and creates a silent failure mode when <code>@file</code> is appended to the ledger verbatim. No other tracing convention uses this pattern.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">Negative. The stated benefit is portability — the annotation works even if the file moves. But the resolved ledger entry then becomes stale on a move anyway. The placeholder gives the illusion of resilience without providing it.</p></div>
+    </div>
+    <p class="diagnosis"><code>@file</code> is the most problematic design decision in Reqtrace v1. The intent was to make annotations location-agnostic — the developer writes the marker without needing to type the full path, and the path is resolved at ledger time via grep. But this creates three costs: (1) every annotation exists in an invalid intermediate state until the ledger pass runs; (2) if the ledger pass never runs or the developer forgets to resolve <code>@file</code>, the ledger contains a broken entry that looks valid; (3) the validator must explicitly reject the literal string <code>@file</code> to catch this failure — a negative check that requires documentation to even explain.</p>
+    <p class="diagnosis">The apparent benefit — not having to type the path — is extremely thin. A developer who is editing <code>examples/refresh-token/src/validation.js</code> knows the path. An AI agent certainly knows the path. The argument that paths change on file rename is also invalid, because the resolved ledger entry changes on rename too. <code>@file</code> defers a known value through an indirection layer that adds a new failure mode for zero resilience gain.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Replace <code>@reqtrace REQUIREMENT/ORDINAL/@file</code> with <code>@reqtrace REQUIREMENT/ORDINAL</code> and make the path implicit from context — it is always the file the annotation lives in. The validator resolves the path from the grep match location. The ledger entry is then generated directly from grep output with no manual resolution step. This eliminates the two-state annotation, the manual ledger pass, and the <code>@file</code> verbatim failure mode in one change.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 3: ORDINAL ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-rework"></div>
+    <div class="head-text">
+      <p class="feat-name">Ordinal (per-requirement sequence number)</p>
+      <span class="feat-sub">The numeric suffix that identifies one implementation occurrence under a requirement</span>
+    </div>
+    <span class="verdict-badge vb-rework">Rework</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">Partially. A requirement often has multiple implementation points (model layer, validation, test). You need a way to distinguish them. But a manual sequence number is not the right mechanism — it creates coordination overhead without being stable.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">High. Developers must know what ordinals already exist before assigning a new one. Two developers working in parallel on the same requirement will collide. The ordinal carries identity in the ledger but provides no protection against duplication.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">Low. The ordinal's only job is distinguishing multiple implementations of the same requirement. This could be done by the file path alone — two annotations in different files are already distinguishable without a numeric suffix.</p></div>
+    </div>
+    <p class="diagnosis">The ordinal is the second most problematic design decision in Reqtrace v1. It is trying to solve a real problem (multiple implementation points per requirement) with a mechanism that requires global coordination between developers. In a solo workflow or an AI-agent workflow with a single actor, ordinals work. In any parallel development context, they are a collision surface.</p>
+    <p class="diagnosis">The deeper issue is that the ordinal encodes sequence, but sequence is not the semantically meaningful dimension. What you actually want to express is: "this is one of multiple places where requirement X is satisfied." The path already encodes which file. The line number (or function name) already encodes which location within the file. The ordinal adds a third identifier that duplicates what context already provides, while creating a new collision risk.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Replace the manual ordinal with an auto-assigned short hash derived from the file path and line number, generated by the validator at ledger-write time. Developers write only <code>@reqtrace REQUIREMENT</code>. The validator, when it generates the ledger entry, appends a stable ID derived from context: <code>AUTH-SESSION-ROTATION/a3f2/examples/refresh-token/src/validation.js:42</code>. This is stable across renames only if the annotation moves with the code, which is the correct behavior, and eliminates all manual ordinal coordination.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 4: The Ledger ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-expand"></div>
+    <div class="head-text">
+      <p class="feat-name">The trace ledger (docs/requirements.md)</p>
+      <span class="feat-sub">The canonical human-readable record of validated traces, appended manually after the ledger pass</span>
+    </div>
+    <span class="verdict-badge vb-expand">Expand scope</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">Yes — the concept is sound. Without a ledger, you have annotations in code but no authoritative record of which annotations have been validated. The ledger is what makes a trace "complete" vs. merely "placed."</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">Very high. The ledger pass is entirely manual: grep, read, assess, append. There is no schema, no structure, no tool to read the ledger back. The result is a free-form document that is maintained by discipline alone and provides no machine-readable signal.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">The concept has high value; the implementation has low value. A ledger that only a human can read and only a human can write cannot be validated, queried, or reported on. It is a log, not a record.</p></div>
+    </div>
+    <p class="diagnosis">The ledger design reveals the core tension in Reqtrace v1: it wants to be grep-native (no tools required) but the ledger pass is the exact point where grep-native breaks down. You cannot grep the ledger to find incomplete traces, detect stale entries, or produce a coverage report — because the ledger has no schema. The ledger is also scope-limited to requirements, but the same tracing pattern is clearly useful for decisions, architecture choices, compliance rules, and test specs. Keeping the ledger requirement-only while those other artifact types exist in the same project is an artificial constraint.</p>
+    <p class="diagnosis">The more fundamental problem: the ledger and the source annotations are two independent records of the same fact. Keeping them synchronized requires human discipline, which is exactly what Reqtrace claims to replace with a convention. This is an internal contradiction in the v1 design.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Auto-generate the ledger from the annotations via the validator, rather than requiring manual append. The developer validates intent; the tool records the result. This eliminates the manual ledger pass. Separately: expand ledger scope beyond requirements to any named handle — decisions, ADRs, specs, policies — using the same annotation syntax. The ledger becomes a project-wide evidence index, not a requirements-only document. Restrict "requirements" to the handle naming convention, not the scope of what is traceable.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 5: Two-stage loop ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-rework"></div>
+    <div class="head-text">
+      <p class="feat-name">Two-stage loop (implement → ledger pass)</p>
+      <span class="feat-sub">The mandatory sequence: implement and annotate first, then grep-validate and record</span>
+    </div>
+    <span class="verdict-badge vb-rework">Rework</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">The separation of annotation and validation is the right instinct — you do not want validation to slow down implementation. But "mandatory" with no enforcement is not a stage; it is a guideline that will be skipped under pressure.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">High. The ledger pass is a context switch: stop coding, grep, assess each hit, open the ledger file, append. For a human developer this is a meaningful interruption. For an AI agent this is a separate invocation with no automated trigger.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">The validation step has high value. The manual-pass mechanism has low value. The value is separable from the mechanism.</p></div>
+    </div>
+    <p class="diagnosis">The two-stage loop is structurally correct — annotation first, validation second — but the implementation relies entirely on developer discipline. There is no enforcement boundary between stage one and stage two. A commit with stage-one annotations but no stage-two ledger entries is structurally indistinguishable from a commit where the ledger pass was completed. The "mandatory" label in the README is aspirational, not enforced.</p>
+    <p class="diagnosis">The loop also collapses two distinct concepts: validation (does this annotation correctly trace to the requirement?) and recording (is the trace in the ledger?). In v1, a developer validates with their own judgment and records by appending text. In a successor product, validation should be a separate, explicit step with a defined output — not just "read the requirement and decide."</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Formalize the two stages as: (1) annotate in code — unchanged; (2) run the validator, which generates or updates the ledger automatically from validated annotations. The developer's validation judgment is exercised during code review, not as a manual pre-append step. The CI check then enforces that every annotation in the codebase has a corresponding ledger entry — no annotation can be in an unresolved state in a merged commit.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 6: Grep-native design ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-keep"></div>
+    <div class="head-text">
+      <p class="feat-name">Grep-native design principle</p>
+      <span class="feat-sub">The commitment that traces are findable with standard tools — no graph server, no database</span>
+    </div>
+    <span class="verdict-badge vb-keep">Keep</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">Yes, as a design constraint. The moment you require a running service to query traces, you've added an infrastructure dependency and broken CI portability. Grep-first means the system degrades gracefully to zero tooling.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">None. Grep-native is a design principle, not a user step. It constrains what the tool can add without adding user cost.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">Very high. This is the core competitive differentiator against heavyweight tracing tools (Jama, Polarion, IBM Doors) and database-backed alternatives. It makes the system universally adoptable.</p></div>
+    </div>
+    <p class="diagnosis">This is the second strongest design decision in Reqtrace v1. The grep-native principle is what makes the tool usable in air-gapped environments, legacy codebases, and AI agent contexts where spinning up a service is not practical. It is also what makes the tool auditable — anyone can verify the traces by running grep without trusting a tool's output.</p>
+    <p class="diagnosis">The risk is that "grep-native" gets used as a reason to avoid adding any tooling at all, which is the trap v1 fell into with the manual ledger pass. Grep-native should mean "grep is always sufficient to find traces" — it should not mean "the only automation is grep." The validator and a CI hook can coexist with the grep-native principle, because grep still works independently of them.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Keep the grep-native principle as a hard constraint: every trace must be findable with a plain grep command, with no tool installed. But decouple it from the anti-tooling stance. The successor product should be grep-native by design and tool-augmented by choice. Automation adds speed and enforcement; grep remains the ground truth.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 7: Optional validator ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-rework"></div>
+    <div class="head-text">
+      <p class="feat-name">Python validator (optional, validate_reqtrace.py)</p>
+      <span class="feat-sub">The dependency-free script that expands @file and checks ledger entries</span>
+    </div>
+    <span class="verdict-badge vb-rework">Rework</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">The validator's existence is necessary. Its optional status is not. Calling it "optional" while describing the ledger pass as "mandatory" is an internal contradiction that signals the feature was added late and not fully integrated into the design.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">Low to run (zero dependencies, plain Python). High to adopt — because there are no CI templates, no pre-commit hooks, and no documentation on where in the workflow to run it. "Optional" is the killer: teams skip optional steps under pressure.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">High potential, low realized value. The validator could be the enforcement backbone of the entire convention, but in v1 it is a demo script positioned below the convention itself in importance.</p></div>
+    </div>
+    <p class="diagnosis">The validator's current scope is narrow: expand <code>@file</code>, check ledger entries match. It does not detect stale paths, does not check ordinal uniqueness, does not generate the ledger, and does not know anything about the requirement beyond its handle string. This makes it a consistency checker for the ledger — useful, but not the central tool it should be.</p>
+    <p class="diagnosis">The "optional" framing also sends a signal to AI agents: if AGENTS.md says the ledger pass is mandatory but the validator is optional, an agent will run the ledger pass manually and skip the validator. This is the opposite of what you want — the validator should run automatically and the manual ledger pass should be deprecated in favor of it.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Promote the validator to the primary delivery mechanism. Make it non-optional by providing a pre-commit hook and a GitHub Actions template in the repo. Expand its responsibilities: detect stale paths, detect unresolved <code>@file</code>, detect ordinal collisions, and — in the successor product — auto-generate ledger entries rather than just checking them. Rename it to something that reflects its central role, not a demo script.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 8: AGENTS.md guidance ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-expand"></div>
+    <div class="head-text">
+      <p class="feat-name">AGENTS.md agent guidance</p>
+      <span class="feat-sub">The 16-line instruction file telling AI agents what Reqtrace is and how to use it</span>
+    </div>
+    <span class="verdict-badge vb-expand">Expand scope</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">Yes. Without explicit agent guidance, AI coding agents will either ignore the convention or invent variations of it. The "Do not invent new canonical requirements in code" rule is the most important constraint in the entire repo — it prevents a very common agent failure mode.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">None for agents. The file is short, unambiguous, and covers the key prohibitions. It is well-written for its size.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">Very high ratio. A 16-line file that prevents agents from hallucinating requirement handles or adding wiki-link syntax is an extremely high-leverage constraint for minimal maintenance cost.</p></div>
+    </div>
+    <p class="diagnosis">The AGENTS.md is one of the two strongest parts of Reqtrace v1 (alongside the annotation itself). The prohibitions are specific and correct: no claims, no parent fields, no wiki links, no JSON refs, no custom hook names. These are exactly the things a capable AI agent might add to "improve" the convention, and each one would break grep-native compatibility.</p>
+    <p class="diagnosis">The gap is that AGENTS.md covers agent behavior during annotation but says nothing about what agents should do when the ledger needs updating, when a trace is found to be stale, or when running the validator. The ledger pass instructions ("append validated expanded traces") are vague enough that an agent could comply with the letter while violating the intent — appending unresolved <code>@file</code> placeholders, for example.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Expand AGENTS.md to cover three explicit agent scenarios: (1) annotating new code — covered well in v1; (2) running the validator and interpreting its output — currently missing; (3) handling stale or invalid traces found during a ledger audit — currently missing. Each scenario should be a named section with step-by-step instructions. The file can grow to 50 lines without losing its value; what matters is specificity, not brevity.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 9: Requirement handle scope ─── -->
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-expand"></div>
+    <div class="head-text">
+      <p class="feat-name">Requirement-only handle scope</p>
+      <span class="feat-sub">The constraint that @reqtrace handles must reference upstream requirements, not other artifact types</span>
+    </div>
+    <span class="verdict-badge vb-expand">Expand scope</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">No. The tracing pattern is equally useful for architecture decisions (ADRs), security controls, compliance rules, test specs, and design constraints. Restricting it to requirements is an artificial boundary that forces teams to choose between tracing requirements and tracing other important artifacts.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">The restriction creates friction in real projects where the implementation evidence for a security control, for example, is more important to trace than the evidence for a functional requirement. Teams either extend the convention informally or don't adopt it for non-requirement tracing needs.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">The restriction reduces value without reducing steps. The annotation syntax works identically for any named handle. The only cost of allowing broader handles is updating AGENTS.md and removing the word "requirement" from the nomenclature.</p></div>
+    </div>
+    <p class="diagnosis">The "requirements only" constraint made sense when Reqtrace was explicitly positioned as a post-requirements-exists tool — it starts after a requirement handle already exists. But this framing conflates the tool's starting condition (a handle exists) with the type of artifact the handle can reference. There is no technical reason why <code>@reqtrace ADR-0012/001</code> or <code>@reqtrace SEC-CONTROL-7/001</code> would not work identically to a requirement handle. The grepping works. The ledger works. The validator can work. Only the name "Reqtrace" and the documentation restrict the scope.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">In the successor product, remove the requirement-only constraint at the design level. Allow any named handle from any upstream artifact type. The convention becomes: "if a project document makes a claim that implementation should satisfy, that claim can be traced." This broadens the addressable use case from requirements management (a niche) to general implementation evidence tracing (a universal need). Consider renaming away from "Reqtrace" to reflect the expanded scope.</div>
+  </div>
+</div>
+
+<!-- ─── FEATURE 10: Skill automation (roadmap) ─── -->
+<div class="roadmap-section">
+  <p class="section-title" style="font-size:14px; margin-bottom:1rem; padding-bottom:0.5rem; border-bottom:0.5px solid var(--color-border-tertiary);">Roadmap features — assessment</p>
+</div>
+
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-rework"></div>
+    <div class="head-text">
+      <p class="feat-name">Skill automation for AI agents</p>
+      <span class="feat-sub">A coding agent skill that automates the annotation and/or ledger pass during AI-assisted implementation</span>
+    </div>
+    <span class="verdict-badge vb-rework">Rework the approach</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">Yes — but only if the underlying annotation and ledger design is simplified first. Automating a flawed convention produces a flawed automation. If @file resolution and the manual ledger pass survive into the successor, the skill will just automate the most error-prone parts of a fragile workflow.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">Depends entirely on what the skill does. A skill that writes annotations is low-friction. A skill that runs the ledger pass — greps, reads, validates, appends — is high-friction for the agent and high-latency for the developer. The two should be separate skills.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">Very high if scope is narrowed to annotation placement only. Medium if it includes ledger management. The skill should do what humans are worst at: remembering to annotate every relevant location. Not what they are best at: deciding whether a trace is valid.</p></div>
+    </div>
+    <p class="diagnosis">Skill automation for Reqtrace is the right roadmap direction but carries a sequencing risk: if the annotation simplification (removing <code>@file</code>, replacing manual ordinals) is not shipped before or alongside the skill, the skill will encode the v1 complexities into an automated workflow that is then hard to change. Agents are good at placing annotations near code they understand; they are poor at knowing whether the trace is semantically valid without reading the requirement.</p>
+    <p class="diagnosis">The most valuable skill is not the ledger-pass automation — it is the annotation-placement suggestion: "you just implemented AUTH-SESSION-ROTATION behavior at line 47; do you want to add a trace annotation?" This keeps the human in the validation loop while removing the cognitive overhead of remembering to annotate.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Build two separate skills: (1) annotation placement — the agent suggests annotations based on requirement context when implementing code, and places them on human confirmation; (2) ledger audit — the agent runs the validator, reports unresolved annotations, stale paths, and ordinal collisions, and auto-generates ledger entries for confirmed valid traces. Keep semantic validation (is this trace actually correct?) as a human step. Don't automate judgment.</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-rework"></div>
+    <div class="head-text">
+      <p class="feat-name">CI/pre-commit enforcement (roadmap)</p>
+      <span class="feat-sub">Automated enforcement that all annotations are resolved and all ledger entries are valid on commit or push</span>
+    </div>
+    <span class="verdict-badge vb-rework">Ship earlier than planned</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">Yes, and more urgently than the skill automation. Without CI enforcement, the "mandatory ledger pass" claim has no teeth. Every team will accumulate unresolved annotations. The validator exists but the enforcement hook does not.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">Low once set up. A pre-commit hook that runs the validator in under two seconds adds negligible friction. The setup cost is a one-time investment in a GitHub Actions template and a <code>.pre-commit-hooks.yaml</code> entry.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">Very high. CI enforcement is what turns a convention into a guarantee. Without it, Reqtrace is "the tracing convention that we try to follow." With it, Reqtrace is "the tracing convention that we cannot violate."</p></div>
+    </div>
+    <p class="diagnosis">CI enforcement should be considered a v1 gap, not a roadmap feature. Its absence is the primary reason the ledger pass is frequently skipped in practice. The validator already does the checks — it just needs to be wired into CI. This is two files: a <code>.github/workflows/reqtrace.yml</code> that runs <code>python scripts/validate_reqtrace.py --strict</code> and a <code>.pre-commit-hooks.yaml</code> entry. Both could be added to the repo today.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Ship the CI template and pre-commit hook immediately, before the skill automation. The sequence should be: fix @file → add auto-ordinals → auto-generate ledger → CI enforcement → skill automation. Enforcement without the prior simplifications will enforce a fragile workflow, which is worse than no enforcement because it breaks CI on legitimate work.</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-head" onclick="toggle(this)">
+    <div class="verdict-dot v-expand"></div>
+    <div class="head-text">
+      <p class="feat-name">Coverage reporting (roadmap)</p>
+      <span class="feat-sub">A report of which requirement handles have zero, partial, or full trace coverage in the codebase</span>
+    </div>
+    <span class="verdict-badge vb-expand">High value — prioritize</span>
+    <span class="expand-hint">▾</span>
+  </div>
+  <div class="feature-body">
+    <div class="qa-grid">
+      <div class="qa-cell"><p class="qa-label">Necessary?</p><p class="qa-text">Yes, for any team using Reqtrace at scale. "Which requirements have no implementation evidence?" is the question that makes tracing valuable in the first place. Without a coverage answer, the ledger is just a log.</p></div>
+      <div class="qa-cell"><p class="qa-label">Friction?</p><p class="qa-text">None for users if the report is auto-generated. The complexity is in the implementation: the reporter needs to read the canonical requirement list and cross-reference against the ledger. This requires the ledger to have a schema — which is itself a blocker if the ledger remains free-form text.</p></div>
+      <div class="qa-cell"><p class="qa-label">Value vs. steps?</p><p class="qa-text">Extremely high. Coverage reporting is the feature that turns Reqtrace from a tracing convention into a project management signal. "3 of 12 requirements have no implementation evidence" is actionable information that the annotation syntax alone cannot provide.</p></div>
+    </div>
+    <p class="diagnosis">Coverage reporting is the killer feature that v1 cannot deliver because the ledger has no schema. To report coverage, you need: (1) a canonical list of requirement handles, (2) a machine-readable ledger, and (3) a diff between them. V1 has (1) implicitly (the requirement handles in the code), but not (2) or (3). The ledger is free-form text that cannot be reliably parsed. This is the strongest argument for defining a ledger schema as a prerequisite to everything else on the roadmap.</p>
+    <p class="rec-label">Recommendation</p>
+    <div class="rec-box">Make coverage reporting the north star feature that backward-constrains the ledger design. The question to answer is: "what ledger format makes coverage reporting easiest to implement and most useful to read?" A structured ledger (YAML or JSON sidecar, or a fenced Markdown table) answers this. Design the ledger schema for the report you want, not for the annotation you have. Then everything else — the validator, the skill, the CI check — serves the coverage report.</div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function toggle(head) {
+  const body = head.nextElementSibling;
+  const hint = head.querySelector('.expand-hint');
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (hint) hint.textContent = isOpen ? '▾' : '▴';
+}
+</script>

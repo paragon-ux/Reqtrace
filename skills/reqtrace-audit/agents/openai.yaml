@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reqtrace Audit"
+  short_description: "Audit and synchronize Reqtrace ledgers"
+  default_prompt: "Use $reqtrace-audit to check and report Reqtrace trace state."

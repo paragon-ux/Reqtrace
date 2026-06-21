@@ -5,7 +5,7 @@ const { revokePreviousRefreshToken, isRefreshTokenRevoked } = require("../src/re
 const { validateRefreshRequest } = require("../src/validation");
 
 function testRefreshTokenRotationPreventsReuse() {
-  // @reqtrace AUTH-SESSION-ROTATION/004/@file
+  // @reqtrace AUTH-SESSION-ROTATION
   const request = validateRefreshRequest({
     refreshToken: "alice:1",
     subject: "alice",

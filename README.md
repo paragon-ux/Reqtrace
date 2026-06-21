@@ -1,85 +1,50 @@
 # Reqtrace
 
-Reqtrace is a grep-native convention for tracing implementation evidence back to an existing requirement.
+Reqtrace is a grep-native convention for tracing implementation evidence to an existing upstream handle. A handle may belong to a requirement, ADR, security control, policy, compliance rule, or test specification.
 
-Reqtrace starts **after** a requirement handle already exists. That handle may come from a spec, ticket, PRD, issue, SDD artifact, or plain Markdown documentation. Reqtrace does not create, rename, split, supersede, or interpret requirements.
+Reqtrace starts after that handle already exists. It does not create, rename, split, supersede, or interpret upstream artifacts.
 
-## What Reqtrace Adds
+## One Marker, One Record
 
-Reqtrace adds one reserved structural marker:
-
-```txt
-@reqtrace <REQUIREMENT>/<ORDINAL>/@file
-```
-
-The marker is placed near implementation or test evidence. The requirement remains defined upstream.
-
-The ordinal is an **implementation ordinal**, not a sub-requirement. It identifies one validated implementation occurrence under the requirement handle.
-
-## Two-stage Loop
-
-1. **Implementation pass** — implement normally and add `@reqtrace` handles near relevant implementation or test evidence.
-2. **Ledger pass** — grep the requirement handle, validate each occurrence against the existing requirement, then append the resolved traces to the requirement's trace ledger.
-
-The ledger pass is mandatory. A trace is not complete until its expanded form is recorded in the ledger or the unresolved handle is removed.
-
-## Basic Syntax
-
-Code comments carry unresolved handles:
+Place one marker near source, test, or documentation evidence:
 
 ```txt
-@reqtrace <REQUIREMENT>/<ORDINAL>/@file
+@reqtrace <handle>
 ```
 
-Documentation ledgers carry resolved traces:
+The validator derives the repo-relative path, line, role, and short occurrence ID. There are no manual ordinals or `@file` placeholders.
 
-```txt
-<REQUIREMENT>/<ORDINAL>/<repo-relative-file-path>
+The canonical ledger is `docs/trace-ledger.jsonl`: a generated, sorted JSON Lines file. `docs/handle-registry.jsonl` lists known upstream handles and their types. Both remain grep-friendly files.
+
+## Workflow
+
+1. Add a marker using an existing registered handle.
+2. Run `python scripts/reqtrace.py generate`.
+3. Run `python scripts/reqtrace.py render` to refresh Markdown ledger blocks.
+4. Run `python scripts/reqtrace.py check --strict` before committing.
+
+`check --strict` is enforced in the supplied pre-commit hook and GitHub Actions workflow. It detects stale ledgers, malformed ledger records, legacy annotations, ambiguous markers, and handles that have not been explicitly registered.
+
+## Commands
+
+```bash
+python scripts/reqtrace.py scan
+python scripts/reqtrace.py generate
+python scripts/reqtrace.py render
+python scripts/reqtrace.py check --strict
+python scripts/reqtrace.py report
+python scripts/reqtrace.py migrate --dry-run
 ```
 
-For example, this code comment:
-
-```js
-// @reqtrace AUTH-SESSION-ROTATION/001/@file
-```
-
-in `examples/refresh-token/src/validation.js` resolves to:
-
-```txt
-AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
-```
+Use `report --format json` for machine-readable coverage. A handle is full when it has implementation evidence, partial when it has only non-implementation evidence, and zero when it has no ledger records.
 
 ## Grep First
 
-Reqtrace works with normal repository tools:
+Reqtrace requires no service, database, daemon, or runtime dependency beyond Python 3's standard library. If the CLI is unavailable, traces remain discoverable with normal repository search:
 
 ```bash
-grep -R "@reqtrace AUTH-SESSION-ROTATION" .
-grep -R "@reqtrace AUTH-SESSION-ROTATION/003" .
+grep -R "@reqtrace " .
+grep -R "ADR-0012" .
 ```
 
-The path returned by grep supplies the file occurrence. No graph lookup is required.
-
-## What Reqtrace Is Not
-
-Reqtrace is not:
-
-- a requirements generator
-- a replacement for SDD tools
-- a requirement-governance process
-- a wiki-link system
-- a graph server
-- a reverse index database
-- a documentation framework
-
-It is a small convention for making implementation evidence easy to find, validate, and record.
-
-## Optional Validation
-
-This demo can include a dependency-free validator:
-
-```bash
-python scripts/validate_reqtrace.py
-```
-
-The validator expands `@file` to the current repo-relative file path and checks that expanded traces match the requirement ledger.
+The optional V1 legacy form is recognized during the transition and configured by `.reqtrace.json`'s `legacy_form` setting. Run `migrate` to rewrite it.

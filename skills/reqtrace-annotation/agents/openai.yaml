@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reqtrace Annotation"
+  short_description: "Place valid Reqtrace evidence markers"
+  default_prompt: "Use $reqtrace-annotation to suggest a trace annotation for this change."

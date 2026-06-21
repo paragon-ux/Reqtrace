@@ -2,15 +2,30 @@
 
 Reqtrace is intentionally small. Keep it grep-native.
 
-## Rules
+## Scenario 1: Annotating New Code
 
-- Do not invent new canonical requirements in code.
-- Use existing requirement handles from docs or task context.
-- Use `@reqtrace <REQUIREMENT>/<ORDINAL>/@file` near implementation evidence.
-- Do not add claims, parent fields, wiki links, JSON refs, or custom hook names.
-- Resolve the filepath from the current file.
-- After implementation, grep the requirement handle.
-- Validate every occurrence against the requirement.
-- Append validated expanded traces to `docs/requirements.md`.
-- Remove invalid or accidental traces.
+- Do not invent new canonical handles in code.
+- Use existing handles from `docs/handle-registry.jsonl` or task context.
+- Use `@reqtrace <HANDLE>` near implementation or test evidence. One marker per line.
+- Do not add ordinals, `@file`, claims, parent fields, wiki links, JSON refs, or custom hook names.
+- If no registry entry exists for the handle, ask before annotating; do not silently register it.
+
+## Scenario 2: Running and Interpreting the Validator
+
+- After implementation, run `python scripts/reqtrace.py check`.
+- If `check` reports drift, run `python scripts/reqtrace.py generate` and `render`, then re-run `check`.
+- Never hand-edit `docs/trace-ledger.jsonl` or the generated block inside any `docs/*.md` file.
+- A non-zero exit from `check --strict` blocks the change; do not bypass it.
+
+## Scenario 3: Handling Stale or Invalid Traces
+
+- Run `python scripts/reqtrace.py report` to see zero, partial, and full coverage handles.
+- For a stale path (file moved or renamed), re-run `generate` and `render`; do not manually patch the ledger.
+- For an invalid or accidental trace, remove the `@reqtrace` comment from source, then re-run `generate`.
+- Do not silently rewrite a handle to a different one; surface the question to a human or the upstream artifact source.
+
+## Boundary
+
+- Reqtrace does not create, rename, or interpret handles.
+- Reqtrace does not require a server, daemon, database, or graph resolver.
 - Keep Reqtrace grep-native.

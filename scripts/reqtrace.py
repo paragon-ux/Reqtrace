@@ -1,0 +1,792 @@
+#!/usr/bin/env python3
+"""Generate, validate, and report grep-native Reqtrace evidence."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import hashlib
+import json
+import re
+import sys
+import tempfile
+from collections import defaultdict
+from dataclasses import dataclass
+from fnmatch import fnmatchcase
+from pathlib import Path
+from typing import Any, Iterable
+
+
+# @reqtrace BRD-7
+# @reqtrace BRD-8
+# @reqtrace BRD-9
+# @reqtrace BRD-10
+# @reqtrace BRD-G5
+# @reqtrace BRD-G8
+# @reqtrace BRD-R1
+# @reqtrace BRD-R2
+# @reqtrace DRD-1
+# @reqtrace DRD-2
+# @reqtrace DRD-3
+# @reqtrace DRD-4
+# @reqtrace DRD-8
+# @reqtrace DRD-24
+# @reqtrace ARD-1
+# @reqtrace ARD-2
+# @reqtrace ARD-R1
+# @reqtrace ARD-5
+# @reqtrace ARD-6
+# @reqtrace ARD-17
+# @reqtrace ARD-18
+# @reqtrace TRD-1
+# @reqtrace TRD-2
+# @reqtrace TRD-11
+# @reqtrace TRD-13
+DEFAULT_CONFIG: dict[str, Any] = {
+    "marker": "@reqtrace",
+    "id_length": 4,
+    "legacy_form": "warn",
+    "excluded_dirs": [".git", "node_modules", "dist", "build", "coverage", ".venv", "site"],
+    "ledger_path": "docs/trace-ledger.jsonl",
+    "registry_path": "docs/handle-registry.jsonl",
+    "role_map": {
+        "src/**": "implementation",
+        "lib/**": "implementation",
+        "app/**": "implementation",
+        "tests/**": "verification",
+        "spec/**": "verification",
+        "docs/**": "documentation",
+        "migrations/**": "migration",
+        "infra/**": "operational",
+        "deploy/**": "operational",
+    },
+}
+
+HANDLE_PATTERN = r"[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*"
+HANDLE_RE = re.compile(rf"^{HANDLE_PATTERN}$")
+TRACE_RE = re.compile(rf"@reqtrace\s+({HANDLE_PATTERN})\b")
+LEGACY_TRACE_RE = re.compile(r"@reqtrace\s+([A-Z]+(?:-[A-Z]+)*)/([0-9]{3})/@file\b")
+LEGACY_LEDGER_RE = re.compile(rf"^\s*-\s+({HANDLE_PATTERN})/([0-9]{{3}})/(\S+)\s*$")
+START_BLOCK_RE = re.compile(rf"^\s*<!--\s*reqtrace:ledger:start\s+handle=({HANDLE_PATTERN})\s*-->\s*$")
+END_BLOCK_RE = re.compile(r"^\s*<!--\s*reqtrace:ledger:end\s*-->\s*$")
+
+
+@dataclass(frozen=True)
+class Occurrence:
+    handle: str
+    path: str
+    line: int
+    kind: str
+
+
+@dataclass(frozen=True)
+class LegacyOccurrence:
+    handle: str
+    ordinal: str
+    path: str
+    line: int
+
+
+@dataclass(frozen=True)
+class LedgerRecord:
+    handle: str
+    id: str
+    path: str
+    line: int
+    kind: str
+
+    def as_json(self) -> dict[str, Any]:
+        return {
+            "handle": self.handle,
+            "id": self.id,
+            "path": self.path,
+            "line": self.line,
+            "kind": self.kind,
+        }
+
+    def identity(self) -> tuple[str, str, str, int, str]:
+        return (self.handle, self.id, self.path, self.line, self.kind)
+
+
+@dataclass
+class ScanResult:
+    occurrences: list[Occurrence]
+    legacy_occurrences: list[LegacyOccurrence]
+    errors: list[str]
+
+
+class ReqtraceError(Exception):
+    """A configuration or file-system failure that maps to exit code 2."""
+
+
+# @reqtrace DRD-8
+# @reqtrace DRD-23
+# @reqtrace ARD-10
+# @reqtrace ARD-14
+# @reqtrace TRD-2
+def load_config(root: Path) -> dict[str, Any]:
+    config = copy.deepcopy(DEFAULT_CONFIG)
+    config_path = root / ".reqtrace.json"
+    if config_path.exists():
+        try:
+            supplied = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ReqtraceError(f"cannot read .reqtrace.json: {error}") from error
+        if not isinstance(supplied, dict):
+            raise ReqtraceError(".reqtrace.json must contain a JSON object")
+        config.update(supplied)
+
+    if not isinstance(config["marker"], str) or not config["marker"].strip():
+        raise ReqtraceError(".reqtrace.json marker must be a non-empty string")
+    if not isinstance(config["id_length"], int) or config["id_length"] < 1:
+        raise ReqtraceError(".reqtrace.json id_length must be a positive integer")
+    if config["legacy_form"] not in {"warn", "reject"}:
+        raise ReqtraceError(".reqtrace.json legacy_form must be 'warn' or 'reject'")
+    if not isinstance(config["excluded_dirs"], list) or not all(
+        isinstance(item, str) and item for item in config["excluded_dirs"]
+    ):
+        raise ReqtraceError(".reqtrace.json excluded_dirs must be a list of directory names")
+    if not isinstance(config["role_map"], dict) or not all(
+        isinstance(pattern, str)
+        and pattern
+        and isinstance(kind, str)
+        and kind
+        for pattern, kind in config["role_map"].items()
+    ):
+        raise ReqtraceError(".reqtrace.json role_map must map non-empty patterns to roles")
+    for key in ("ledger_path", "registry_path"):
+        if not isinstance(config[key], str) or not config[key]:
+            raise ReqtraceError(f".reqtrace.json {key} must be a non-empty string")
+        project_path(root, config[key])
+    return config
+
+
+def project_path(root: Path, configured_path: str) -> Path:
+    candidate = (root / configured_path).resolve()
+    try:
+        candidate.relative_to(root.resolve())
+    except ValueError as error:
+        raise ReqtraceError(f"configured path escapes the repository: {configured_path}") from error
+    return candidate
+
+
+def compile_patterns(marker: str) -> tuple[re.Pattern[str], re.Pattern[str]]:
+    escaped_marker = re.escape(marker)
+    return (
+        re.compile(rf"{escaped_marker}\s+({HANDLE_PATTERN})\b"),
+        re.compile(rf"{escaped_marker}\s+([A-Z]+(?:-[A-Z]+)*)/([0-9]{{3}})/@file\b"),
+    )
+
+
+def is_excluded(root: Path, path: Path, excluded_dirs: set[str]) -> bool:
+    return any(part in excluded_dirs for part in path.relative_to(root).parts)
+
+
+# @reqtrace BRD-2
+# @reqtrace BRD-3
+# @reqtrace BRD-5
+# @reqtrace BRD-G1
+# @reqtrace BRD-G2
+# @reqtrace DRD-5
+# @reqtrace DRD-6
+# @reqtrace DRD-7
+# @reqtrace DRD-8
+# @reqtrace DRD-14
+# @reqtrace DRD-22
+# @reqtrace ARD-7
+# @reqtrace ARD-11
+# @reqtrace ARD-12
+# @reqtrace TRD-3
+def scan_repository(root: Path, config: dict[str, Any]) -> ScanResult:
+    trace_re, legacy_re = compile_patterns(config["marker"])
+    excluded_dirs = set(config["excluded_dirs"])
+    ledger_path = project_path(root, config["ledger_path"])
+    registry_path = project_path(root, config["registry_path"])
+    occurrences: list[Occurrence] = []
+    legacy_occurrences: list[LegacyOccurrence] = []
+    errors: list[str] = []
+
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or is_excluded(root, path, excluded_dirs):
+            continue
+        if path.resolve() in {ledger_path, registry_path}:
+            continue
+        relative_path = path.relative_to(root).as_posix()
+        if path.suffix.lower() == ".md" and not relative_path.startswith("docs/"):
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        except OSError as error:
+            raise ReqtraceError(f"cannot read {path.relative_to(root).as_posix()}: {error}") from error
+
+        kind = role_for_path(relative_path, config["role_map"])
+        for line_number, line in enumerate(lines, start=1):
+            current_matches = list(trace_re.finditer(line))
+            legacy_matches = list(legacy_re.finditer(line))
+            nonlegacy_current = [
+                match
+                for match in current_matches
+                if not any(legacy.start() <= match.start() < legacy.end() for legacy in legacy_matches)
+            ]
+            marker_count = len(nonlegacy_current) + len(legacy_matches)
+            location = f"{relative_path}:{line_number}"
+            if marker_count > 1:
+                errors.append(f"E_MULTIPLE_MARKERS_ON_LINE {location}")
+                continue
+            if legacy_matches and nonlegacy_current:
+                errors.append(f"E_AMBIGUOUS_MARKER {location}")
+                continue
+            if legacy_matches:
+                legacy = legacy_matches[0]
+                legacy_occurrences.append(
+                    LegacyOccurrence(legacy.group(1), legacy.group(2), relative_path, line_number)
+                )
+                continue
+            if nonlegacy_current:
+                current = nonlegacy_current[0]
+                occurrences.append(Occurrence(current.group(1), relative_path, line_number, kind))
+
+    return ScanResult(occurrences, legacy_occurrences, errors)
+
+
+def role_for_path(relative_path: str, role_map: dict[str, str]) -> str:
+    for pattern, kind in role_map.items():
+        if fnmatchcase(relative_path, pattern):
+            return kind
+    return "unknown"
+
+
+# @reqtrace BRD-G2
+# @reqtrace BRD-M3
+# @reqtrace DRD-6
+# @reqtrace ARD-3
+# @reqtrace TRD-4
+def short_id(path: str, line: int, length: int = 4) -> str:
+    digest = hashlib.sha256(f"{path}:{line}".encode("utf-8")).hexdigest()
+    return digest[:length]
+
+
+def records_from_occurrences(
+    occurrences: Iterable[Occurrence], id_length: int
+) -> tuple[list[LedgerRecord], list[str]]:
+    ordered = sorted(occurrences, key=lambda item: (item.handle, item.path, item.line))
+    lengths = []
+    for length in (id_length, 6, 8):
+        if length not in lengths:
+            lengths.append(length)
+
+    for length in lengths:
+        records = [
+            LedgerRecord(item.handle, short_id(item.path, item.line, length), item.path, item.line, item.kind)
+            for item in ordered
+        ]
+        ids_by_handle: dict[str, set[str]] = defaultdict(set)
+        collision = False
+        for record in records:
+            if record.id in ids_by_handle[record.handle]:
+                collision = True
+                break
+            ids_by_handle[record.handle].add(record.id)
+        if not collision:
+            return records, []
+    return [], ["E_ID_COLLISION unable to disambiguate occurrence IDs at 8 hex characters"]
+
+
+# @reqtrace BRD-4
+# @reqtrace BRD-G3
+# @reqtrace BRD-M1
+# @reqtrace BRD-M3
+# @reqtrace DRD-11
+# @reqtrace DRD-12
+# @reqtrace ARD-3
+# @reqtrace ARD-4
+# @reqtrace ARD-8
+# @reqtrace ARD-9
+# @reqtrace TRD-5
+def write_ledger(path: Path, records: Iterable[LedgerRecord]) -> None:
+    ordered = sorted(records, key=lambda item: (item.handle, item.path, item.line))
+    content = "".join(
+        json.dumps(record.as_json(), separators=(", ", ": ")) + "\n" for record in ordered
+    )
+    atomic_write_text(path, content)
+
+
+def atomic_write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", newline="\n", delete=False, dir=path.parent
+        ) as temporary:
+            temporary.write(content)
+            temporary_name = temporary.name
+        Path(temporary_name).replace(path)
+    except OSError as error:
+        if temporary_name:
+            Path(temporary_name).unlink(missing_ok=True)
+        raise ReqtraceError(f"cannot write {path}: {error}") from error
+
+
+def read_ledger(path: Path) -> tuple[list[LedgerRecord], list[str]]:
+    if not path.exists():
+        return [], []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise ReqtraceError(f"cannot read {path}: {error}") from error
+
+    records: list[LedgerRecord] = []
+    errors: list[str] = []
+    for line_number, raw_line in enumerate(lines, start=1):
+        try:
+            value = json.loads(raw_line)
+        except json.JSONDecodeError as error:
+            errors.append(f"E_LEDGER_PARSE {path.as_posix()}:{line_number}: {error.msg}")
+            continue
+        if not isinstance(value, dict):
+            errors.append(f"E_LEDGER_PARSE {path.as_posix()}:{line_number}: record must be an object")
+            continue
+        record = ledger_record_from_json(value)
+        if record is None:
+            errors.append(f"E_LEDGER_PARSE {path.as_posix()}:{line_number}: invalid record schema")
+            continue
+        records.append(record)
+    return records, errors
+
+
+def ledger_record_from_json(value: dict[str, Any]) -> LedgerRecord | None:
+    required = ("handle", "id", "path", "line", "kind")
+    if any(field not in value for field in required):
+        return None
+    handle, record_id, path, line, kind = (value[field] for field in required)
+    if not isinstance(handle, str) or not HANDLE_RE.fullmatch(handle):
+        return None
+    if not isinstance(record_id, str) or not re.fullmatch(r"[0-9a-f]+", record_id):
+        return None
+    if not isinstance(path, str) or not path or Path(path).is_absolute() or "\\" in path:
+        return None
+    if not isinstance(line, int) or isinstance(line, bool) or line < 1:
+        return None
+    if not isinstance(kind, str) or not kind:
+        return None
+    return LedgerRecord(handle, record_id, path, line, kind)
+
+
+# @reqtrace BRD-6
+# @reqtrace BRD-G6
+# @reqtrace BRD-G7
+# @reqtrace BRD-M4
+# @reqtrace BRD-M6
+# @reqtrace BRD-R4
+# @reqtrace DRD-9
+# @reqtrace DRD-10
+# @reqtrace ARD-13
+# @reqtrace ARD-R2
+# @reqtrace TRD-6
+def read_registry(path: Path) -> tuple[list[dict[str, str]], list[str]]:
+    if not path.exists():
+        return [], []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise ReqtraceError(f"cannot read {path}: {error}") from error
+
+    entries: list[dict[str, str]] = []
+    errors: list[str] = []
+    handles: set[str] = set()
+    for line_number, raw_line in enumerate(lines, start=1):
+        try:
+            value = json.loads(raw_line)
+        except json.JSONDecodeError as error:
+            errors.append(f"registry parse error {path.as_posix()}:{line_number}: {error.msg}")
+            continue
+        if not isinstance(value, dict):
+            errors.append(f"registry parse error {path.as_posix()}:{line_number}: record must be an object")
+            continue
+        handle = value.get("handle")
+        entry_type = value.get("type")
+        source = value.get("source")
+        if (
+            not isinstance(handle, str)
+            or not HANDLE_RE.fullmatch(handle)
+            or not isinstance(entry_type, str)
+            or not entry_type
+            or (source is not None and not isinstance(source, str))
+            or handle in handles
+        ):
+            errors.append(f"registry parse error {path.as_posix()}:{line_number}: invalid record schema")
+            continue
+        handles.add(handle)
+        entry = {"handle": handle, "type": entry_type}
+        if source is not None:
+            entry["source"] = source
+        entries.append(entry)
+    return entries, errors
+
+
+def register_unknown_handles(
+    path: Path, records: Iterable[LedgerRecord]
+) -> list[str]:
+    entries, errors = read_registry(path)
+    if errors:
+        return errors
+    known = {entry["handle"] for entry in entries}
+    additions = sorted({record.handle for record in records} - known)
+    if not additions:
+        return []
+    original = path.read_text(encoding="utf-8") if path.exists() else ""
+    if original and not original.endswith("\n"):
+        original += "\n"
+    content = original + "".join(
+        json.dumps({"handle": handle, "type": "unknown"}, separators=(", ", ": ")) + "\n"
+        for handle in additions
+    )
+    atomic_write_text(path, content)
+    return []
+
+
+def print_messages(messages: Iterable[str], stream: Any = sys.stderr) -> None:
+    for message in messages:
+        print(message, file=stream)
+
+
+def scan_records(root: Path, config: dict[str, Any]) -> tuple[ScanResult, list[LedgerRecord], list[str]]:
+    scan = scan_repository(root, config)
+    records, record_errors = records_from_occurrences(scan.occurrences, config["id_length"])
+    return scan, records, [*scan.errors, *record_errors]
+
+
+# @reqtrace BRD-8
+# @reqtrace DRD-4
+# @reqtrace DRD-16
+# @reqtrace DRD-20
+# @reqtrace ARD-7
+# @reqtrace ARD-15
+# @reqtrace TRD-7
+def command_scan(root: Path, config: dict[str, Any], _: argparse.Namespace) -> int:
+    scan, records, errors = scan_records(root, config)
+    grouped: dict[str, list[LedgerRecord]] = defaultdict(list)
+    for record in records:
+        grouped[record.handle].append(record)
+    if not grouped and not scan.legacy_occurrences:
+        print("No Reqtrace comments found.")
+    for handle in sorted(grouped):
+        print(handle)
+        for record in grouped[handle]:
+            print(f"  {record.path}:{record.line} id={record.id} kind={record.kind}")
+    for legacy in scan.legacy_occurrences:
+        print(f"legacy {legacy.path}:{legacy.line} {legacy.handle}/{legacy.ordinal}")
+    print_messages(errors)
+    return 0
+
+
+# @reqtrace BRD-4
+# @reqtrace BRD-G3
+# @reqtrace BRD-M1
+# @reqtrace BRD-M3
+# @reqtrace DRD-12
+# @reqtrace DRD-16
+# @reqtrace DRD-13
+# @reqtrace ARD-3
+# @reqtrace ARD-4
+# @reqtrace TRD-7
+def command_generate(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
+    scan, records, errors = scan_records(root, config)
+    if errors:
+        print_messages(errors)
+        return 2
+    if args.register_unknown:
+        registry_errors = register_unknown_handles(project_path(root, config["registry_path"]), records)
+        if registry_errors:
+            print_messages(registry_errors)
+            return 2
+    write_ledger(project_path(root, config["ledger_path"]), records)
+    if scan.legacy_occurrences:
+        for legacy in scan.legacy_occurrences:
+            print(
+                f"warning: E_LEGACY_FORM {legacy.path}:{legacy.line} "
+                f"{legacy.handle}/{legacy.ordinal}",
+                file=sys.stderr,
+            )
+    return 0
+
+
+# @reqtrace BRD-4
+# @reqtrace BRD-G3
+# @reqtrace DRD-11
+# @reqtrace DRD-12
+# @reqtrace ARD-4
+# @reqtrace TRD-5
+# @reqtrace TRD-7
+def command_render(root: Path, config: dict[str, Any], _: argparse.Namespace) -> int:
+    ledger_path = project_path(root, config["ledger_path"])
+    records, errors = read_ledger(ledger_path)
+    if errors:
+        print_messages(errors)
+        return 2
+    try:
+        render_documents(root, config, records)
+    except ReqtraceError as error:
+        print(error, file=sys.stderr)
+        return 2
+    return 0
+
+
+def render_documents(root: Path, config: dict[str, Any], records: Iterable[LedgerRecord]) -> None:
+    records_by_handle: dict[str, list[LedgerRecord]] = defaultdict(list)
+    for record in records:
+        records_by_handle[record.handle].append(record)
+    excluded_dirs = set(config["excluded_dirs"])
+    docs_root = root / "docs"
+    if not docs_root.exists():
+        return
+    for path in sorted(docs_root.rglob("*.md")):
+        if is_excluded(root, path, excluded_dirs):
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        except OSError as error:
+            raise ReqtraceError(f"cannot read {path.relative_to(root).as_posix()}: {error}") from error
+        rendered: list[str] = []
+        changed = False
+        index = 0
+        while index < len(lines):
+            start = START_BLOCK_RE.match(lines[index].rstrip("\r\n"))
+            if not start:
+                rendered.append(lines[index])
+                index += 1
+                continue
+            handle = start.group(1)
+            rendered.append(lines[index])
+            index += 1
+            end_index = index
+            while end_index < len(lines) and not END_BLOCK_RE.match(lines[end_index].rstrip("\r\n")):
+                end_index += 1
+            if end_index == len(lines):
+                raise ReqtraceError(
+                    f"unterminated ledger block for {handle} in {path.relative_to(root).as_posix()}"
+                )
+            for record in sorted(records_by_handle[handle], key=lambda item: (item.path, item.line)):
+                rendered.append(f"- {record.handle}/{record.id}/{record.path}:{record.line}\n")
+            rendered.append(lines[end_index])
+            index = end_index + 1
+            changed = True
+        if changed:
+            atomic_write_text(path, "".join(rendered))
+
+
+# @reqtrace BRD-1
+# @reqtrace BRD-G4
+# @reqtrace BRD-M2
+# @reqtrace DRD-15
+# @reqtrace DRD-16
+# @reqtrace DRD-21
+# @reqtrace DRD-23
+# @reqtrace ARD-10
+# @reqtrace ARD-12
+# @reqtrace ARD-16
+# @reqtrace TRD-7
+# @reqtrace TRD-10
+# @reqtrace TRD-8
+def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
+    scan, generated, errors = scan_records(root, config)
+    failures = False
+    if errors:
+        print_messages(errors)
+        failures = True
+    for legacy in scan.legacy_occurrences:
+        message = f"E_LEGACY_FORM {legacy.path}:{legacy.line} {legacy.handle}/{legacy.ordinal}"
+        if config["legacy_form"] == "reject":
+            print(message, file=sys.stderr)
+            failures = True
+        else:
+            print(f"warning: {message}", file=sys.stderr)
+
+    committed, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
+    if ledger_errors:
+        print_messages(ledger_errors)
+        failures = True
+    elif sorted(record.identity() for record in generated) != sorted(
+        record.identity() for record in committed
+    ):
+        print("E_STALE_LEDGER committed ledger differs from a fresh scan", file=sys.stderr)
+        failures = True
+
+    if args.strict:
+        registry, registry_errors = read_registry(project_path(root, config["registry_path"]))
+        if registry_errors:
+            print_messages(registry_errors)
+            failures = True
+        else:
+            registry_by_handle = {entry["handle"]: entry for entry in registry}
+            for handle in sorted({record.handle for record in generated}):
+                entry = registry_by_handle.get(handle)
+                if entry is None or entry["type"] == "unknown":
+                    print(f"E_HANDLE_NOT_REGISTERED {handle}", file=sys.stderr)
+                    failures = True
+    return 1 if failures else 0
+
+
+# @reqtrace BRD-G7
+# @reqtrace BRD-M4
+# @reqtrace DRD-9
+# @reqtrace DRD-10
+# @reqtrace ARD-13
+# @reqtrace TRD-7
+# @reqtrace TRD-12
+def command_report(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
+    registry, registry_errors = read_registry(project_path(root, config["registry_path"]))
+    ledger, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
+    if registry_errors or ledger_errors:
+        print_messages([*registry_errors, *ledger_errors])
+        return 2
+    records_by_handle: dict[str, list[LedgerRecord]] = defaultdict(list)
+    for record in ledger:
+        records_by_handle[record.handle].append(record)
+    buckets: dict[str, list[dict[str, Any]]] = {"zero": [], "partial": [], "full": []}
+    for entry in sorted(registry, key=lambda item: item["handle"]):
+        records = records_by_handle[entry["handle"]]
+        item: dict[str, Any] = {**entry, "occurrences": len(records)}
+        if not records:
+            bucket = "zero"
+        elif any(record.kind == "implementation" for record in records):
+            bucket = "full"
+        else:
+            bucket = "partial"
+        buckets[bucket].append(item)
+    if args.format == "json":
+        print(json.dumps(buckets, indent=2))
+        return 0
+    total = len(registry)
+    print(
+        f"Coverage: {len(buckets['full'])} full, {len(buckets['partial'])} partial, "
+        f"{len(buckets['zero'])} zero ({total} registered handles)"
+    )
+    for bucket in ("zero", "partial", "full"):
+        print(f"{bucket} ({len(buckets[bucket])})")
+        for entry in buckets[bucket]:
+            print(f"  {entry['handle']} [{entry['type']}] {entry['occurrences']} occurrence(s)")
+    return 0
+
+
+def read_legacy_ledger(root: Path) -> list[tuple[str, str, str]]:
+    legacy_ledger = root / "docs" / "requirements.md"
+    if not legacy_ledger.exists():
+        return []
+    try:
+        lines = legacy_ledger.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise ReqtraceError(f"cannot read docs/requirements.md: {error}") from error
+    entries: list[tuple[str, str, str]] = []
+    for line in lines:
+        match = LEGACY_LEDGER_RE.match(line)
+        if match:
+            entries.append(match.groups())
+    return entries
+
+
+# @reqtrace BRD-R3
+# @reqtrace BRD-M5
+# @reqtrace DRD-22
+# @reqtrace DRD-23
+# @reqtrace ARD-10
+# @reqtrace ARD-19
+# @reqtrace TRD-9
+def command_migrate(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
+    scan = scan_repository(root, config)
+    if scan.errors:
+        print_messages(scan.errors)
+        return 2
+    legacy_ledger = read_legacy_ledger(root)
+    post_migration_locations = {
+        (occurrence.handle, occurrence.path) for occurrence in scan.occurrences
+    } | {(occurrence.handle, occurrence.path) for occurrence in scan.legacy_occurrences}
+    warnings = [
+        f"warning: legacy ledger entry has no matching post-migration code occurrence: "
+        f"{handle}/{ordinal}/{path}"
+        for handle, ordinal, path in legacy_ledger
+        if (handle, path) not in post_migration_locations
+    ]
+    if args.dry_run:
+        for occurrence in scan.legacy_occurrences:
+            print(
+                f"would migrate {occurrence.path}:{occurrence.line} "
+                f"{occurrence.handle}/{occurrence.ordinal}"
+            )
+        print_messages(warnings)
+        return 1 if warnings else 0
+
+    legacy_re = compile_patterns(config["marker"])[1]
+    changed_paths = sorted({root / occurrence.path for occurrence in scan.legacy_occurrences})
+    for path in changed_paths:
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError as error:
+            print(f"cannot read {path.relative_to(root).as_posix()}: {error}", file=sys.stderr)
+            return 2
+        migrated = legacy_re.sub(lambda match: f"{config['marker']} {match.group(1)}", content)
+        atomic_write_text(path, migrated)
+
+    migrated_scan, records, errors = scan_records(root, config)
+    if errors or migrated_scan.legacy_occurrences:
+        print_messages(errors)
+        for occurrence in migrated_scan.legacy_occurrences:
+            print(f"E_LEGACY_FORM {occurrence.path}:{occurrence.line}", file=sys.stderr)
+        return 2
+    write_ledger(project_path(root, config["ledger_path"]), records)
+    print_messages(warnings)
+    return 1 if warnings else 0
+
+
+# @reqtrace BRD-1
+# @reqtrace BRD-G4
+# @reqtrace DRD-16
+# @reqtrace DRD-17
+# @reqtrace DRD-18
+# @reqtrace DRD-19
+# @reqtrace ARD-6
+# @reqtrace ARD-15
+# @reqtrace ARD-R3
+# @reqtrace TRD-7
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Operate the grep-native Reqtrace ledger.")
+    subcommands = parser.add_subparsers(dest="command", required=True)
+    subcommands.add_parser("scan", help="print source annotations")
+    generate = subcommands.add_parser("generate", help="write the canonical JSONL ledger")
+    generate.add_argument(
+        "--register-unknown", action="store_true", help="add unregistered handles as type unknown"
+    )
+    subcommands.add_parser("render", help="render Markdown ledger blocks")
+    check = subcommands.add_parser("check", help="fail when the committed ledger is stale")
+    check.add_argument("--strict", action="store_true", help="require explicit registered handle types")
+    report = subcommands.add_parser("report", help="report coverage from registry and ledger")
+    report.add_argument("--format", choices=("text", "json"), default="text")
+    migrate = subcommands.add_parser("migrate", help="rewrite legacy annotations and generate the ledger")
+    migrate.add_argument("--dry-run", action="store_true", help="show migration changes without writing")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    root = Path(__file__).resolve().parents[1]
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        config = load_config(root)
+        commands = {
+            "scan": command_scan,
+            "generate": command_generate,
+            "render": command_render,
+            "check": command_check,
+            "report": command_report,
+            "migrate": command_migrate,
+        }
+        return commands[args.command](root, config, args)
+    except ReqtraceError as error:
+        print(error, file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

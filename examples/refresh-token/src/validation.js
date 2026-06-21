@@ -1,5 +1,5 @@
 function validateRefreshRequest(request) {
-  // @reqtrace AUTH-SESSION-ROTATION/001/@file
+  // @reqtrace AUTH-SESSION-ROTATION
   if (!request || typeof request.refreshToken !== "string") {
     throw new Error("A refresh token is required.");
   }

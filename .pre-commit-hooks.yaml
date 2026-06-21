@@ -1,0 +1,5 @@
+- id: reqtrace
+  name: Validate Reqtrace ledger
+  entry: python scripts/reqtrace.py check --strict
+  language: system
+  pass_filenames: false

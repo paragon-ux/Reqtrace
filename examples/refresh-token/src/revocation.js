@@ -1,5 +1,5 @@
 function revokePreviousRefreshToken(store, rotatedSession) {
-  // @reqtrace AUTH-SESSION-ROTATION/003/@file
+  // @reqtrace AUTH-SESSION-ROTATION
   store.revokedTokens.add(rotatedSession.previousRefreshToken);
 
   return {

@@ -1,5 +1,5 @@
 function rotateRefreshToken(session) {
-  // @reqtrace AUTH-SESSION-ROTATION/002/@file
+  // @reqtrace AUTH-SESSION-ROTATION
   const nextToken = `${session.subject}:${session.version + 1}`;
 
   return {

@@ -1,54 +1,21 @@
 # Rules
 
-Reqtrace rules are mechanical. They govern trace handles and ledgers, not the requirement process.
-
-1. A requirement handle must already exist upstream.
-2. A Reqtrace handle never defines, rewrites, splits, supersedes, or interprets a requirement.
-3. The ordinal is an implementation ordinal, not a sub-requirement.
-4. `@file` must remain literal in code comments.
-5. Documentation ledgers must contain resolved traces, not `@file`.
-6. Every implementation pass with Reqtrace handles must end with a grep pass.
-7. Every valid trace must be appended to the requirement's trace ledger.
-8. Invalid traces must be removed or fixed.
-9. If an upstream requirement handle changes, update unresolved code handles and resolved ledger entries together.
-10. Role is inferred from file path and surrounding code; do not add separate hooks such as `@implements` or `@verifies`.
-11. File moves do not require rewriting code comments; they require regenerating or updating resolved ledger entries.
-12. No server, daemon, database, or graph resolver is required.
-
-## Ordinal Rules
-
-An ordinal identifies one validated implementation occurrence under a requirement handle.
-
-Good:
-
-```txt
-AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
-AUTH-SESSION-ROTATION/002/examples/refresh-token/src/rotation.js
-AUTH-SESSION-ROTATION/003/examples/refresh-token/src/revocation.js
-```
-
-Suspicious or invalid:
-
-```txt
-AUTH-SESSION-ROTATION/001/examples/refresh-token/src/validation.js
-AUTH-SESSION-ROTATION/001/examples/refresh-token/src/rotation.js
-```
-
-If two files provide different evidence, give them different ordinals.
+1. A handle must already exist in an upstream source or task context.
+2. Reqtrace never creates, renames, splits, supersedes, or interprets handles.
+3. Use only the `@reqtrace` marker; do not add role-specific hook names.
+4. Put at most one valid marker on a line.
+5. Keep the annotation payload to the handle: no ordinal and no `@file` placeholder.
+6. Treat `docs/trace-ledger.jsonl` and Markdown ledger blocks as generator-owned.
+7. Run `generate`, `render`, and `check` after changing evidence.
+8. Use `check --strict` before merging; it rejects stale ledgers and unregistered or unknown handles.
+9. For a moved file, regenerate rather than editing the ledger path by hand.
+10. For an invalid trace, remove the source marker rather than relabeling it silently.
+11. Keep the convention grep-native: no claims, parent fields, wiki links, JSON references, custom hook names, server, daemon, database, or graph resolver.
 
 ## Role Inference
 
-Reqtrace uses one hook: `@reqtrace`.
+The first matching `role_map` pattern in `.reqtrace.json` determines the generated `kind`. The defaults cover common source, test, documentation, migration, infrastructure, and deployment paths; repositories can override the map without changing the parser.
 
-It does not need separate hooks like `@implements`, `@verifies`, or `@supports`. Role is inferred from the file path and surrounding code:
+## Registry
 
-```txt
-src/**         implementation evidence
-tests/**       verification evidence
-docs/**        documentation evidence
-migrations/**  migration evidence
-```
-
-## Ledger Rule
-
-The ledger is the mandatory second stage. A code comment is only an unresolved trace. The ledger contains validated expanded traces.
+`docs/handle-registry.jsonl` contains one JSON object per known handle with a `handle`, `type`, and optional upstream `source`. `generate --register-unknown` is an on-ramp for discovery, but an `unknown` type does not satisfy `check --strict`.
