@@ -2,7 +2,8 @@
 
 A successful refresh-token exchange must rotate the refresh token and prevent reuse of the old token.
 
-This requirement is the source of truth for the demo. The entries below are generated implementation traces, not requirement definitions.
+Each source or test occurrence has one marker.
+`generate` writes the JSONL ledger and `render` writes this block.
 
 ## Trace Ledger
 
