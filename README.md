@@ -1,8 +1,12 @@
+[![CI](https://github.com/paragon-ux/Reqtrace/actions/workflows/reqtrace.yml/badge.svg)](https://github.com/paragon-ux/Reqtrace/actions/workflows/reqtrace.yml)
+
 # Reqtrace
 
 Reqtrace is a grep-native convention for tracing implementation evidence to an existing upstream handle. A handle may belong to a requirement, ADR, security control, policy, compliance rule, or test specification.
 
 Reqtrace starts after that handle already exists. It does not create, rename, split, supersede, or interpret upstream artifacts.
+
+Current release: [`v2.1.0`](https://github.com/paragon-ux/Reqtrace/releases/tag/v2.1.0) ("Verified").
 
 ## One Marker, One Record
 
@@ -53,3 +57,25 @@ grep -R "ADR-0012" .
 ```
 
 The optional V1 legacy form is recognized during the transition and configured by `.reqtrace.json`'s `legacy_form` setting. Run `migrate` to rewrite it.
+
+## Examples
+
+- **[examples/refresh-token/](examples/refresh-token/)** — Full walkthrough:
+  two source files, one test, and a rendered ledger block for a token-rotation
+  requirement.
+- **[examples/calibration/](examples/calibration/)** — Seven scenario fixtures
+  proving every documented claim. Run `python examples/calibration/run.py` to
+  verify.
+
+## Documentation Site
+
+The full reference is published at
+[https://paragon-ux.github.io/Reqtrace/](https://paragon-ux.github.io/Reqtrace/).
+
+## Integrations
+
+- **`.pre-commit-hooks.yaml`** — Pre-commit hook that runs `check --strict`
+  to block trace drift before commit.
+- **`AGENTS.md`** — Guidance for AI coding agents working in this repo.
+- **`skills/`** — Reqtrace annotation and audit skills for AI-assisted
+  development workflows.

@@ -18,3 +18,9 @@ jobs:
 
       - name: Validate Reqtrace ledger
         run: python scripts/reqtrace.py check --strict
+
+      - name: Run tests
+        run: python -m pytest tests/ -v
+
+      - name: Run calibration
+        run: python examples/calibration/run.py
