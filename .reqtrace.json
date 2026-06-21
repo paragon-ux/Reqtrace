@@ -3,7 +3,8 @@
   "id_length": 4,
   "legacy_form": "reject",
   "strict_level": "ledger",
-  "excluded_dirs": [".git", "node_modules", "dist", "build", "coverage", ".venv", "site", "V2"],
+  "doc_hierarchy": ["BRD", "ARD", "DRD", "TRD"],
+  "excluded_dirs": [".git", "node_modules", "dist", "build", "coverage", ".venv", "site", "V2", "calibration"],
   "ledger_path": "docs/trace-ledger.jsonl",
   "registry_path": "docs/handle-registry.jsonl",
   "role_map": {

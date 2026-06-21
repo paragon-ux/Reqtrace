@@ -16,39 +16,13 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Iterable
 
-# @reqtrace BRD-7
-# @reqtrace BRD-8
-# @reqtrace BRD-9
-# @reqtrace BRD-10
-# @reqtrace BRD-G5
-# @reqtrace BRD-G8
-# @reqtrace BRD-R1
-# @reqtrace BRD-R2
-# @reqtrace DRD-1
-# @reqtrace DRD-2
-# @reqtrace DRD-3
-# @reqtrace DRD-4
-# @reqtrace DRD-8
-# @reqtrace DRD-24
-# @reqtrace ARD-1
-# @reqtrace ARD-2
-# @reqtrace ARD-R1
-# @reqtrace ARD-5
-# @reqtrace ARD-6
-# @reqtrace ARD-17
-# @reqtrace ARD-18
 # @reqtrace TRD-1
-# @reqtrace TRD-2
-# @reqtrace TRD-11
-# @reqtrace TRD-13
-# @reqtrace V2M-BRD-2
-# @reqtrace V2M-DRD-4
-# @reqtrace V2M-TRD-2
 DEFAULT_CONFIG: dict[str, Any] = {
     "marker": "@reqtrace",
     "id_length": 4,
     "legacy_form": "reject",
     "strict_level": "ledger",
+    "doc_hierarchy": [],
     "excluded_dirs": [".git", "node_modules", "dist", "build", "coverage", ".venv", "site"],
     "ledger_path": "docs/trace-ledger.jsonl",
     "registry_path": "docs/handle-registry.jsonl",
@@ -128,14 +102,7 @@ class ScanResult:
 class ReqtraceError(Exception):
     """A configuration or file-system failure that maps to exit code 2."""
 
-# @reqtrace DRD-8
-# @reqtrace DRD-23
-# @reqtrace ARD-10
-# @reqtrace ARD-14
 # @reqtrace TRD-2
-# @reqtrace V2M-DRD-4
-# @reqtrace V2M-ARD-10
-# @reqtrace V2M-TRD-2
 def load_config(root: Path) -> dict[str, Any]:
     config = copy.deepcopy(DEFAULT_CONFIG)
     config_path = root / ".reqtrace.json"
@@ -165,6 +132,10 @@ def load_config(root: Path) -> dict[str, Any]:
         raise ReqtraceError(".reqtrace.json legacy_form must be 'warn' or 'reject'")
     if config["strict_level"] not in {"ledger", "full"}:
         raise ReqtraceError(".reqtrace.json strict_level must be 'ledger' or 'full'")
+    if not isinstance(config["doc_hierarchy"], list) or not all(
+        isinstance(prefix, str) for prefix in config["doc_hierarchy"]
+    ):
+        raise ReqtraceError(".reqtrace.json doc_hierarchy must be a list of strings")
     if not isinstance(config["excluded_dirs"], list) or not all(
         isinstance(item, str) and item for item in config["excluded_dirs"]
     ):
@@ -183,12 +154,6 @@ def load_config(root: Path) -> dict[str, Any]:
         project_path(root, config[key])
     return config
 
-# @reqtrace V2M-BRD-4
-# @reqtrace V2M-DRD-10
-# @reqtrace V2M-ARD-3
-# @reqtrace V2M-ARD-8
-# @reqtrace V2M-ARD-9
-# @reqtrace V2M-TRD-1
 def starter_config(root: Path) -> dict[str, Any]:
     role_map = {
         pattern: kind
@@ -207,7 +172,6 @@ def project_path(root: Path, configured_path: str) -> Path:
         raise ReqtraceError(f"configured path escapes the repository: {configured_path}") from error
     return candidate
 
-# @reqtrace V2M-ARD-1
 def find_project_root(start: Path) -> Path:
     for candidate in (start, *start.parents):
         if (candidate / ".reqtrace.json").exists():
@@ -223,25 +187,15 @@ def compile_patterns(marker: str) -> tuple[re.Pattern[str], re.Pattern[str]]:
         re.compile(rf"{escaped_marker}\s+({HANDLE_PATTERN})/([0-9]{{3}})/@file\b"),
     )
 
+
+def handle_prefix(handle: str) -> str:
+    """Return the document-type prefix from a requirement handle."""
+    return handle.split("-", 1)[0]
+
 def is_excluded(root: Path, path: Path, excluded_dirs: set[str]) -> bool:
     return any(part in excluded_dirs for part in path.relative_to(root).parts)
 
-# @reqtrace BRD-2
-# @reqtrace BRD-3
-# @reqtrace BRD-5
-# @reqtrace BRD-G1
-# @reqtrace BRD-G2
-# @reqtrace DRD-5
-# @reqtrace DRD-6
-# @reqtrace DRD-7
-# @reqtrace DRD-8
-# @reqtrace DRD-14
-# @reqtrace DRD-22
-# @reqtrace ARD-7
-# @reqtrace ARD-11
-# @reqtrace ARD-12
 # @reqtrace TRD-3
-# @reqtrace V2M-DRD-3
 def scan_repository(root: Path, config: dict[str, Any]) -> ScanResult:
     trace_re, legacy_re = compile_patterns(config["marker"])
     excluded_dirs = set(config["excluded_dirs"])
@@ -301,12 +255,7 @@ def role_for_path(relative_path: str, role_map: dict[str, str]) -> str:
             return kind
     return "unknown"
 
-# @reqtrace BRD-G2
-# @reqtrace BRD-M3
-# @reqtrace DRD-6
-# @reqtrace ARD-3
 # @reqtrace TRD-4
-# @reqtrace V2M-DRD-2
 def short_id(path: str, line: int, length: int = 4) -> str:
     digest = hashlib.sha256(f"{path}:{line}".encode("utf-8")).hexdigest()
     return digest[:length]
@@ -333,16 +282,6 @@ def records_from_occurrences(
         length += 1
     return [], [f"E_ID_COLLISION unable to disambiguate occurrence IDs at {MAX_ID_LENGTH} hex characters"]
 
-# @reqtrace BRD-4
-# @reqtrace BRD-G3
-# @reqtrace BRD-M1
-# @reqtrace BRD-M3
-# @reqtrace DRD-11
-# @reqtrace DRD-12
-# @reqtrace ARD-3
-# @reqtrace ARD-4
-# @reqtrace ARD-8
-# @reqtrace ARD-9
 # @reqtrace TRD-5
 def write_ledger(path: Path, records: Iterable[LedgerRecord]) -> None:
     ordered = sorted(records, key=lambda item: (item.handle, item.path, item.line))
@@ -392,8 +331,6 @@ def read_ledger(path: Path) -> tuple[list[LedgerRecord], list[str]]:
         records.append(record)
     return records, errors
 
-# @reqtrace V2M-ARD-10
-# @reqtrace V2M-TRD-9
 def ledger_record_from_json(value: dict[str, Any]) -> LedgerRecord | None:
     required = ("handle", "id", "path", "line", "kind")
     if not set(required) <= set(value):
@@ -413,16 +350,6 @@ def ledger_record_from_json(value: dict[str, Any]) -> LedgerRecord | None:
         return None
     return LedgerRecord(handle=handle, id=record_id, path=path, line=line, kind=kind)
 
-# @reqtrace BRD-6
-# @reqtrace BRD-G6
-# @reqtrace BRD-G7
-# @reqtrace BRD-M4
-# @reqtrace BRD-M6
-# @reqtrace BRD-R4
-# @reqtrace DRD-9
-# @reqtrace DRD-10
-# @reqtrace ARD-13
-# @reqtrace ARD-R2
 # @reqtrace TRD-6
 def read_registry(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     if not path.exists():
@@ -495,12 +422,6 @@ def scan_records(root: Path, config: dict[str, Any]) -> tuple[ScanResult, list[L
     records, record_errors = records_from_occurrences(scan.occurrences, config["id_length"])
     return scan, records, [*scan.errors, *record_errors]
 
-# @reqtrace V2M-BRD-4
-# @reqtrace V2M-DRD-10
-# @reqtrace V2M-ARD-1
-# @reqtrace V2M-ARD-3
-# @reqtrace V2M-ARD-8
-# @reqtrace V2M-TRD-1
 def command_init(root: Path, _: argparse.Namespace) -> int:
     config_path = root / ".reqtrace.json"
     config = starter_config(root)
@@ -539,24 +460,16 @@ def command_init(root: Path, _: argparse.Namespace) -> int:
     print(f"3. Run {invocation} check --strict.")
     return 0
 
-# @reqtrace BRD-8
-# @reqtrace DRD-4
-# @reqtrace DRD-16
-# @reqtrace DRD-20
-# @reqtrace ARD-7
-# @reqtrace ARD-15
 # @reqtrace TRD-7
-# @reqtrace V2M-BRD-5
-# @reqtrace V2M-DRD-8
-# @reqtrace V2M-DRD-9
-# @reqtrace V2M-TRD-4
 def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, records, errors = scan_records(root, config)
     diff = getattr(args, "diff", False)
     if diff:
         committed, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
         errors.extend(ledger_errors)
-        if not ledger_errors:
+        if ledger_errors:
+            records = []
+        else:
             committed_identities = {record.source_identity() for record in committed}
             records = [record for record in records if record.source_identity() not in committed_identities]
     if getattr(args, "format", "text") == "json":
@@ -590,15 +503,6 @@ def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -
     print_messages(errors)
     return 0
 
-# @reqtrace BRD-4
-# @reqtrace BRD-G3
-# @reqtrace BRD-M1
-# @reqtrace BRD-M3
-# @reqtrace DRD-12
-# @reqtrace DRD-16
-# @reqtrace DRD-13
-# @reqtrace ARD-3
-# @reqtrace ARD-4
 # @reqtrace TRD-7
 def command_generate(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, records, errors = scan_records(root, config)
@@ -607,7 +511,13 @@ def command_generate(root: Path, config: dict[str, Any], args: argparse.Namespac
         return 2
     write_ledger(project_path(root, config["ledger_path"]), records)
     if args.register_unknown:
-        registry_errors = register_unknown_handles(project_path(root, config["registry_path"]), records)
+        try:
+            registry_errors = register_unknown_handles(
+                project_path(root, config["registry_path"]), records
+            )
+        except ReqtraceError as error:
+            print(error, file=sys.stderr)
+            return 2
         if registry_errors:
             print_messages(registry_errors)
             return 2
@@ -620,12 +530,6 @@ def command_generate(root: Path, config: dict[str, Any], args: argparse.Namespac
             )
     return 0
 
-# @reqtrace BRD-4
-# @reqtrace BRD-G3
-# @reqtrace DRD-11
-# @reqtrace DRD-12
-# @reqtrace ARD-4
-# @reqtrace TRD-5
 # @reqtrace TRD-7
 def command_render(root: Path, config: dict[str, Any], _: argparse.Namespace) -> int:
     ledger_path = project_path(root, config["ledger_path"])
@@ -682,25 +586,7 @@ def render_documents(root: Path, config: dict[str, Any], records: Iterable[Ledge
         if changed:
             atomic_write_text(path, "".join(rendered))
 
-# @reqtrace BRD-1
-# @reqtrace BRD-G4
-# @reqtrace BRD-M2
-# @reqtrace DRD-15
-# @reqtrace DRD-16
-# @reqtrace DRD-21
-# @reqtrace DRD-23
-# @reqtrace ARD-10
-# @reqtrace ARD-12
-# @reqtrace ARD-16
-# @reqtrace TRD-7
-# @reqtrace TRD-10
 # @reqtrace TRD-8
-# @reqtrace V2M-BRD-2
-# @reqtrace V2M-DRD-4
-# @reqtrace V2M-DRD-6
-# @reqtrace V2M-ARD-5
-# @reqtrace V2M-ARD-6
-# @reqtrace V2M-TRD-2
 def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, generated, errors = scan_records(root, config)
     failures = False
@@ -730,6 +616,42 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
                 print("hint: ledger may need regeneration after id_length change", file=sys.stderr)
             failures = True
 
+    if config["doc_hierarchy"]:
+        leaf = config["doc_hierarchy"][-1]
+        implementation_records = [record for record in generated if record.kind == "implementation"]
+        for record in implementation_records:
+            prefix = handle_prefix(record.handle)
+            if prefix != leaf and (prefix in config["doc_hierarchy"] or prefix == "V2M"):
+                print(
+                    f"E_OFFLEAF_HANDLE {record.handle} at {record.path}:{record.line} "
+                    f"(expected leaf: {leaf})",
+                    file=sys.stderr,
+                )
+                failures = True
+        records_by_file: dict[str, list[LedgerRecord]] = defaultdict(list)
+        for record in implementation_records:
+            records_by_file[record.path].append(record)
+        for file_path, file_records in records_by_file.items():
+            ordered_records = sorted(file_records, key=lambda record: record.line)
+            blocks: list[list[LedgerRecord]] = []
+            current_block = [ordered_records[0]]
+            for record in ordered_records[1:]:
+                if record.line - current_block[-1].line <= 1:
+                    current_block.append(record)
+                else:
+                    blocks.append(current_block)
+                    current_block = [record]
+            blocks.append(current_block)
+            for block in blocks:
+                handles = sorted({record.handle for record in block})
+                if len(handles) > 1:
+                    print(
+                        f"E_MULTI_HANDLE_EVIDENCE {file_path}:{block[0].line}-{block[-1].line} "
+                        f"has {len(handles)} handles: {', '.join(handles)}",
+                        file=sys.stderr,
+                    )
+                    failures = True
+
     requested_level = getattr(args, "strict", None)
     strict_level = requested_level if requested_level is not None else config["strict_level"]
     if strict_level == "full":
@@ -744,21 +666,18 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
                 if entry is None or entry["type"] == "unknown":
                     print(f"E_HANDLE_NOT_REGISTERED {handle}", file=sys.stderr)
                     failures = True
+            for entry in registry:
+                source = entry.get("source")
+                if source and not (root / source).exists():
+                    print(
+                        f"E_REGISTRY_SOURCE_MISSING {entry['handle']} "
+                        f"(source: {source} not found)",
+                        file=sys.stderr,
+                    )
+                    failures = True
     return 1 if failures else 0
 
-# @reqtrace BRD-G7
-# @reqtrace BRD-M4
-# @reqtrace DRD-9
-# @reqtrace DRD-10
-# @reqtrace ARD-13
-# @reqtrace TRD-7
 # @reqtrace TRD-12
-# @reqtrace V2M-BRD-3
-# @reqtrace V2M-DRD-5
-# @reqtrace V2M-DRD-7
-# @reqtrace V2M-DRD-9
-# @reqtrace V2M-ARD-7
-# @reqtrace V2M-TRD-3
 def command_report(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     registry, registry_errors = read_registry(project_path(root, config["registry_path"]))
     ledger, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
@@ -849,16 +768,7 @@ def read_legacy_ledger(root: Path) -> list[tuple[str, str, str]]:
             entries.append(match.groups())
     return entries
 
-# @reqtrace BRD-R3
-# @reqtrace BRD-M5
-# @reqtrace DRD-22
-# @reqtrace DRD-23
-# @reqtrace ARD-10
-# @reqtrace ARD-19
 # @reqtrace TRD-9
-# @reqtrace V2M-BRD-8
-# @reqtrace V2M-DRD-13
-# @reqtrace V2M-TRD-6
 def command_migrate(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     print(
         "warning: migrate is deprecated V1 transition support; use only for legacy annotations.",
@@ -908,18 +818,7 @@ def command_migrate(root: Path, config: dict[str, Any], args: argparse.Namespace
     print_messages(warnings)
     return 1 if warnings else 0
 
-# @reqtrace BRD-1
-# @reqtrace BRD-G4
-# @reqtrace DRD-16
-# @reqtrace DRD-17
-# @reqtrace DRD-18
-# @reqtrace DRD-19
-# @reqtrace ARD-6
-# @reqtrace ARD-15
-# @reqtrace ARD-R3
 # @reqtrace TRD-7
-# @reqtrace V2M-DRD-9
-# @reqtrace V2M-TRD-1
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Operate the grep-native Reqtrace ledger.")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -948,8 +847,6 @@ def build_parser() -> argparse.ArgumentParser:
     migrate.add_argument("--dry-run", action="store_true", help="show migration changes without writing")
     return parser
 
-# @reqtrace V2M-ARD-1
-# @reqtrace V2M-TRD-1
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)

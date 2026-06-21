@@ -265,10 +265,10 @@ class EdgeCaseTests(unittest.TestCase):
                     rc = reqtrace.main(["init"])
             finally:
                 os.chdir(original_dir)
-        self.assertEqual(rc, 2)
-        # config must not have been overwritten
-        config = json.loads((root / ".reqtrace.json").read_text(encoding="utf-8"))
-        self.assertEqual(config["strict_level"], "ledger")
+            self.assertEqual(rc, 2)
+            # config must not have been overwritten
+            config = json.loads((root / ".reqtrace.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["strict_level"], "ledger")
 
     # ------------------------------------------------------------------
     # BUG-5: scan --diff builds committed_identities from a partial ledger
@@ -434,21 +434,20 @@ class EdgeCaseTests(unittest.TestCase):
 
     def test_bug8_annotation_moved_between_role_dirs_not_shown_as_new(self) -> None:
         """
-        After BUG-8 fix (kind dropped from source_identity), moving a file from
-        src/ to tests/ changes the kind from implementation to verification but
-        the annotation at (handle, path, line) is still the same. scan --diff
-        must NOT show it as new.
+        After BUG-8 fix (kind dropped from source_identity), changing a path's
+        inferred role changes kind but not the annotation's physical location.
+        scan --diff must NOT show that annotation as new.
         """
         with self.make_root() as directory:
             root = Path(directory)
-            # Ledger records src/feature.py as implementation
+            # Ledger records src/feature.py as implementation.
             self.write(
                 root / "docs" / "trace-ledger.jsonl",
                 self.ledger_record("ADR-0012", "abcd", "src/feature.py", 1, "implementation"),
             )
-            # But now the file lives at tests/feature.py (same annotation, different kind)
-            self.write(root / "tests" / "feature.py", f"# {MARKER} ADR-0012\n")
+            self.write(root / "src" / "feature.py", f"# {MARKER} ADR-0012\n")
             config = self.config(root)
+            config["role_map"] = {"src/**": "verification"}
             json_out = io.StringIO()
             with contextlib.redirect_stdout(json_out):
                 reqtrace.command_scan(
@@ -456,12 +455,12 @@ class EdgeCaseTests(unittest.TestCase):
                 )
             result = json.loads(json_out.getvalue())
             found_as_new = any(
-                entry["handle"] == "ADR-0012" and entry["path"] == "tests/feature.py"
+                entry["handle"] == "ADR-0012" and entry["path"] == "src/feature.py"
                 for entry in result
             )
             self.assertFalse(
                 found_as_new,
-                "relocating a file between role dirs must not show annotation as new in --diff",
+                "changing only an annotation role must not show it as new in --diff",
             )
 
     # ------------------------------------------------------------------

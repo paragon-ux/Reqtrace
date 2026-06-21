@@ -277,12 +277,6 @@ class ReqtraceCliTests(unittest.TestCase):
             config["legacy_form"] = "reject"
             self.assertEqual(reqtrace.command_check(root, config, SimpleNamespace(strict=None)), 1)
 
-    # @reqtrace V2M-BRD-6
-    # @reqtrace V2M-ARD-11
-    # @reqtrace V2M-TRD-8
-    # @reqtrace V2M-TRD-9
-    # @reqtrace V2M-TRD-10
-    # @reqtrace V2M-TRD-11
     def test_default_legacy_form_is_reject(self) -> None:
         with self.make_root() as directory:
             root = Path(directory)
