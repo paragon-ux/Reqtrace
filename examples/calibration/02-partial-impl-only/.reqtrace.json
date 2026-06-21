@@ -1,0 +1,8 @@
+{
+  "legacy_form": "reject",
+  "strict_level": "ledger",
+  "role_map": {
+    "src/**": "implementation",
+    "tests/**": "verification"
+  }
+}

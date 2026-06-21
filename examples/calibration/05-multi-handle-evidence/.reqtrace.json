@@ -1,0 +1,8 @@
+{
+  "legacy_form": "reject",
+  "strict_level": "ledger",
+  "doc_hierarchy": ["BRD", "ARD", "DRD", "TRD"],
+  "role_map": {
+    "src/**": "implementation"
+  }
+}

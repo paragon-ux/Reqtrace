@@ -23,20 +23,25 @@ The canonical ledger is `docs/trace-ledger.jsonl`: a generated, sorted JSON Line
 3. Run `python scripts/reqtrace.py render` to refresh Markdown ledger blocks.
 4. Run `python scripts/reqtrace.py check --strict` before committing.
 
-`check --strict` is enforced in the supplied pre-commit hook and GitHub Actions workflow. It detects stale ledgers, malformed ledger records, legacy annotations, ambiguous markers, and handles that have not been explicitly registered.
+`check --strict` is enforced in the supplied pre-commit hook and GitHub Actions workflow. It detects stale ledgers, malformed ledger records, legacy annotations, and ambiguous markers. Use `check --strict=full` to also require complete registry metadata.
 
 ## Commands
 
-```bash
-python scripts/reqtrace.py scan
-python scripts/reqtrace.py generate
-python scripts/reqtrace.py render
-python scripts/reqtrace.py check --strict
-python scripts/reqtrace.py report
-python scripts/reqtrace.py migrate --dry-run
-```
+| Command | Purpose |
+| --- | --- |
+| `python scripts/reqtrace.py init` | Create a starter config, empty registry, and empty ledger from detected project directories. |
+| `python scripts/reqtrace.py scan` | Print annotations for diagnosis. |
+| `python scripts/reqtrace.py scan --format json` | Emit annotation objects for automation. |
+| `python scripts/reqtrace.py scan --diff` | Show source annotations absent from the committed ledger. |
+| `python scripts/reqtrace.py generate` | Write the canonical JSONL ledger. |
+| `python scripts/reqtrace.py render` | Refresh Markdown ledger blocks. |
+| `python scripts/reqtrace.py check --strict` | Use the configured strict policy (`ledger` by default). |
+| `python scripts/reqtrace.py check --strict=ledger` | Enforce ledger freshness only. |
+| `python scripts/reqtrace.py check --strict=full` | Enforce ledger freshness and registry completeness. |
+| `python scripts/reqtrace.py report --format github` | Emit a Markdown coverage table. |
+| `python scripts/reqtrace.py migrate --dry-run` | Inspect deprecated V1 transition migration. |
 
-Use `report --format json` for machine-readable coverage. A handle is full when it has implementation evidence, partial when it has only non-implementation evidence, and zero when it has no ledger records.
+Use `report --format json` for machine-readable coverage. A handle is full when it has implementation evidence, partial when it has only non-implementation evidence, and zero when it has no ledger records; each entry also lists observed role kinds and status.
 
 ## Grep First
 

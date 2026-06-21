@@ -1,0 +1,7 @@
+{
+  "legacy_form": "warn",
+  "strict_level": "ledger",
+  "role_map": {
+    "src/**": "implementation"
+  }
+}
