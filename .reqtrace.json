@@ -1,7 +1,8 @@
 {
   "marker": "@reqtrace",
   "id_length": 4,
-  "legacy_form": "warn",
+  "legacy_form": "reject",
+  "strict_level": "ledger",
   "excluded_dirs": [".git", "node_modules", "dist", "build", "coverage", ".venv", "site", "V2"],
   "ledger_path": "docs/trace-ledger.jsonl",
   "registry_path": "docs/handle-registry.jsonl",

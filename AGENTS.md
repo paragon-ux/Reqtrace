@@ -24,6 +24,12 @@ Reqtrace is intentionally small. Keep it grep-native.
 - For an invalid or accidental trace, remove the `@reqtrace` comment from source, then re-run `generate`.
 - Do not silently rewrite a handle to a different one; surface the question to a human or the upstream artifact source.
 
+## Scenario 4: Adding a New Requirement Handle
+
+- Confirm the canonical handle exists in its upstream artifact before using it; Reqtrace does not create it.
+- Add its `handle`, `type`, and optional `source` to `docs/handle-registry.jsonl` when registry metadata is required.
+- Annotate evidence, run `generate` and `render`, then use `check --strict=full` to verify the registry entry.
+
 ## Boundary
 
 - Reqtrace does not create, rename, or interpret handles.
