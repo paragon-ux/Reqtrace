@@ -47,6 +47,21 @@ The canonical ledger is `docs/trace-ledger.jsonl`: a generated, sorted JSON Line
 
 Use `report --format json` for machine-readable coverage. A handle is full when it has implementation evidence, partial when it has only non-implementation evidence, and zero when it has no ledger records; each entry also lists observed role kinds and status.
 
+## What Reqtrace Delegates
+
+Reqtrace v2.1.5 stabilizes the evidence convention. It does not replace every
+surrounding workflow.
+
+- **Search / command compression:** use `grep`, `rg`, or RTK.
+- **Hierarchy presets:** use Doorstop, Sphinx-Needs/Open-Needs, OpenFastTrace, Jira, or Azure Boards. Reqtrace coexists with any of these; use their IDs as handles.
+- **HTML dashboards:** generate from `report --format json`.
+- **Blame / provenance:** join `scan --format json` and `trace-ledger.jsonl` in downstream tooling.
+- **Graph visualization:** build from the registry and ledger JSONL files.
+
+Reqtrace owns the portable evidence layer. See
+[`docs/adr/0001-v2.1.5-core-boundaries.md`](docs/adr/0001-v2.1.5-core-boundaries.md)
+for the full delegation rationale.
+
 ## Grep First
 
 Reqtrace requires no service, database, daemon, or runtime dependency beyond Python 3's standard library. If the CLI is unavailable, traces remain discoverable with normal repository search:

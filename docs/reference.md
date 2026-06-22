@@ -29,8 +29,10 @@ For moved files, run `generate` and `render`; do not edit the ledger manually.
 ## Commands
 
 `init` writes a starter `.reqtrace.json`, empty registry, and empty ledger after detecting `src/`, `tests/`, `docs/`, `lib/`, and `app/` directories. It does not create handles.
-`scan --format json` emits annotation objects with `handle`, `path`, and `line`; `scan --diff` limits output to annotations absent from the committed ledger.
+`scan --format json` emits annotation objects with `handle`, `path`, `line`, `kind`, and `id`; the last two are `null` without a matching ledger record. `scan --diff` limits output to annotations absent from the committed ledger.
 `report --format github` emits a Markdown table with implementation, verification, documentation, and role-aware status columns.
+`report --format json` emits the versioned coverage envelope documented in [`schema.md`](schema.md). `check --format json` emits a machine-readable pass or failure status.
+`register <HANDLE> [--type TYPE] [--source PATH]` appends one validated registry record and prints a paste-ready marker.
 `migrate` is deprecated V1 transition support. The default `legacy_form` policy is `reject`.
 
 ## Self-Tracing

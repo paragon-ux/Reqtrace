@@ -488,8 +488,8 @@ class EdgeCaseTests(unittest.TestCase):
                     root, self.config(root), SimpleNamespace(format="json")
                 )
             report = json.loads(json_out.getvalue())
-            full_handles = [entry["handle"] for entry in report["full"]]
-            partial_handles = [entry["handle"] for entry in report["partial"]]
+            full_handles = [entry["handle"] for entry in report["handles"]["full"]]
+            partial_handles = [entry["handle"] for entry in report["handles"]["partial"]]
             self.assertNotIn("ADR-0012", full_handles, "impl-only must not be in 'full' bucket")
             self.assertIn("ADR-0012", partial_handles, "impl-only must be in 'partial' bucket")
 
@@ -509,7 +509,7 @@ class EdgeCaseTests(unittest.TestCase):
             report = json.loads(json_out.getvalue())
             self.assertNotIn(
                 "ADR-0012",
-                [e["handle"] for e in report["full"]],
+                [e["handle"] for e in report["handles"]["full"]],
                 "verification-only must not be in 'full' bucket",
             )
 
@@ -528,7 +528,7 @@ class EdgeCaseTests(unittest.TestCase):
                     root, self.config(root), SimpleNamespace(format="json")
                 )
             report = json.loads(json_out.getvalue())
-            self.assertIn("ADR-0012", [e["handle"] for e in report["full"]])
+            self.assertIn("ADR-0012", [e["handle"] for e in report["handles"]["full"]])
 
     # ------------------------------------------------------------------
     # BUG-10: records_from_occurrences gives up after 3 lengths

@@ -189,11 +189,11 @@ class ReqtraceCliTests(unittest.TestCase):
                     reqtrace.command_report(root, self.config(root), SimpleNamespace(format="json")), 0
                 )
             report = json.loads(output.getvalue())
-            self.assertEqual([entry["handle"] for entry in report["partial"]], ["ADR-0012"])
-            self.assertEqual([entry["handle"] for entry in report["zero"]], ["SEC-CONTROL-7"])
-            self.assertEqual(report["partial"][0]["kinds"], ["verification"])
-            self.assertFalse(report["partial"][0]["implementation"])
-            self.assertTrue(report["partial"][0]["verification"])
+            self.assertEqual([entry["handle"] for entry in report["handles"]["partial"]], ["ADR-0012"])
+            self.assertEqual([entry["handle"] for entry in report["handles"]["zero"]], ["SEC-CONTROL-7"])
+            self.assertEqual(report["handles"]["partial"][0]["kinds"], ["verification"])
+            self.assertFalse(report["handles"]["partial"][0]["implementation"])
+            self.assertTrue(report["handles"]["partial"][0]["verification"])
 
     def test_strict_ledger_allows_incomplete_registry_but_full_rejects_it(self) -> None:
         with self.make_root() as directory:
@@ -582,15 +582,15 @@ class ReqtraceCliTests(unittest.TestCase):
             report = json.loads(output.getvalue())
             entries = {
                 entry["handle"]: entry
-                for bucket in report.values()
+                for bucket in report["handles"].values()
                 for entry in bucket
             }
             self.assertEqual(entries["ADR-0012"]["status"], "both")
             self.assertEqual(entries["AUTH"]["status"], "documentation-only")
             self.assertEqual(entries["SEC-CONTROL-7"]["status"], "verification")
             self.assertEqual(entries["UNUSED"]["status"], "none")
-            self.assertEqual([entry["handle"] for entry in report["full"]], ["ADR-0012"])
-            self.assertEqual([entry["handle"] for entry in report["zero"]], ["AUTH", "UNUSED"])
+            self.assertEqual([entry["handle"] for entry in report["handles"]["full"]], ["ADR-0012"])
+            self.assertEqual([entry["handle"] for entry in report["handles"]["zero"]], ["AUTH", "UNUSED"])
 
     def test_report_includes_unregistered_ledger_handles(self) -> None:
         with self.make_root() as directory:
@@ -614,7 +614,7 @@ class ReqtraceCliTests(unittest.TestCase):
                     reqtrace.command_report(root, self.config(root), SimpleNamespace(format="json")), 0
                 )
             report = json.loads(output.getvalue())
-            partial = report["partial"]
+            partial = report["handles"]["partial"]
             self.assertEqual(partial[0]["handle"], "ADR-0012")
             self.assertEqual(partial[0]["type"], "unknown")
 
@@ -654,7 +654,15 @@ class ReqtraceCliTests(unittest.TestCase):
                 )
             self.assertEqual(
                 json.loads(output.getvalue()),
-                [{"handle": "ADR-0012", "path": "src/feature.py", "line": 1}],
+                [
+                    {
+                        "handle": "ADR-0012",
+                        "path": "src/feature.py",
+                        "line": 1,
+                        "kind": None,
+                        "id": None,
+                    }
+                ],
             )
 
     def test_scan_diff_lists_annotations_absent_from_ledger(self) -> None:
@@ -672,7 +680,15 @@ class ReqtraceCliTests(unittest.TestCase):
                 )
             self.assertEqual(
                 json.loads(output.getvalue()),
-                [{"handle": "ADR-0012", "path": "src/feature.py", "line": 1}],
+                [
+                    {
+                        "handle": "ADR-0012",
+                        "path": "src/feature.py",
+                        "line": 1,
+                        "kind": None,
+                        "id": None,
+                    }
+                ],
             )
 
     def test_scan_diff_uses_source_identity_and_reports_no_new_annotations(self) -> None:

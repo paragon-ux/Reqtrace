@@ -351,7 +351,7 @@ def ledger_record_from_json(value: dict[str, Any]) -> LedgerRecord | None:
     return LedgerRecord(handle=handle, id=record_id, path=path, line=line, kind=kind)
 
 # @reqtrace TRD-6
-def read_registry(path: Path) -> tuple[list[dict[str, str]], list[str]]:
+def read_registry(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
     if not path.exists():
         return [], []
     try:
@@ -359,7 +359,7 @@ def read_registry(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     except OSError as error:
         raise ReqtraceError(f"cannot read {path}: {error}") from error
 
-    entries: list[dict[str, str]] = []
+    entries: list[dict[str, Any]] = []
     errors: list[str] = []
     handles: set[str] = set()
     for line_number, raw_line in enumerate(lines, start=1):
@@ -376,19 +376,15 @@ def read_registry(path: Path) -> tuple[list[dict[str, str]], list[str]]:
         source = value.get("source")
         if (
             not isinstance(handle, str)
-            or not HANDLE_RE.fullmatch(handle)
-            or not isinstance(entry_type, str)
-            or not entry_type
+            or not re.fullmatch(r"[A-Za-z0-9_-]+", handle)
+            or (entry_type is not None and (not isinstance(entry_type, str) or not entry_type))
             or (source is not None and not isinstance(source, str))
             or handle in handles
         ):
             errors.append(f"registry parse error {path.as_posix()}:{line_number}: invalid record schema")
             continue
         handles.add(handle)
-        entry = {"handle": handle, "type": entry_type}
-        if source is not None:
-            entry["source"] = source
-        entries.append(entry)
+        entries.append(value)
     return entries, errors
 
 def register_unknown_handles(
@@ -460,23 +456,74 @@ def command_init(root: Path, _: argparse.Namespace) -> int:
     print(f"3. Run {invocation} check --strict.")
     return 0
 
+
+# @reqtrace TRD-7
+def command_register(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
+    handle = args.handle
+    if not isinstance(handle, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", handle):
+        print(f"E_INVALID_HANDLE: {handle!r} must match [A-Za-z0-9_-]+", file=sys.stderr)
+        return 1
+
+    registry_path = project_path(root, config["registry_path"])
+    registry, errors = read_registry(registry_path)
+    if errors:
+        print_messages(errors)
+        return 2
+    if handle in {entry["handle"] for entry in registry}:
+        print(f"E_DUPLICATE_HANDLE: {handle} is already registered", file=sys.stderr)
+        return 1
+
+    source = args.source
+    if source is not None and not project_path(root, source).is_file():
+        print(f"E_REGISTRY_SOURCE_MISSING: {source} not found", file=sys.stderr)
+        return 1
+
+    entry: dict[str, str] = {"handle": handle}
+    if args.type is not None:
+        entry["type"] = args.type
+    if source is not None:
+        entry["source"] = source
+    original = registry_path.read_text(encoding="utf-8") if registry_path.exists() else ""
+    if original and not original.endswith("\n"):
+        original += "\n"
+    atomic_write_text(registry_path, original + json.dumps(entry, separators=(", ", ": ")) + "\n")
+    print(f"REQTRACE REGISTERED {handle}")
+    print(f"marker:   {config['marker']} {handle}")
+    print(f"registry: {config['registry_path']}")
+    return 0
+
 # @reqtrace TRD-7
 def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, records, errors = scan_records(root, config)
     diff = getattr(args, "diff", False)
-    if diff:
+    output_format = getattr(args, "format", "text")
+    committed: list[LedgerRecord] = []
+    ledger_errors: list[str] = []
+    if diff or output_format == "json":
         committed, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
         errors.extend(ledger_errors)
+    if diff:
         if ledger_errors:
             records = []
         else:
             committed_identities = {record.source_identity() for record in committed}
             records = [record for record in records if record.source_identity() not in committed_identities]
-    if getattr(args, "format", "text") == "json":
+    if output_format == "json":
+        committed_by_source = {record.source_identity(): record for record in committed}
         print(
             json.dumps(
                 [
-                    {"handle": record.handle, "path": record.path, "line": record.line}
+                    {
+                        "handle": record.handle,
+                        "path": record.path,
+                        "line": record.line,
+                        "kind": committed_by_source.get(record.source_identity()).kind
+                        if record.source_identity() in committed_by_source
+                        else None,
+                        "id": committed_by_source.get(record.source_identity()).id
+                        if record.source_identity() in committed_by_source
+                        else None,
+                    }
                     for record in records
                 ],
                 indent=2,
@@ -590,31 +637,39 @@ def render_documents(root: Path, config: dict[str, Any], records: Iterable[Ledge
 def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, generated, errors = scan_records(root, config)
     failures = False
-    if errors:
-        print_messages(errors)
+    error_codes: list[str] = []
+
+    def emit_error(message: str) -> None:
+        nonlocal failures
+        print(message, file=sys.stderr)
+        code = message.split(" ", 1)[0]
+        if code not in error_codes:
+            error_codes.append(code)
         failures = True
+
+    if errors:
+        for message in errors:
+            emit_error(message)
     for legacy in scan.legacy_occurrences:
         message = f"E_LEGACY_FORM {legacy.path}:{legacy.line} {legacy.handle}/{legacy.ordinal}"
         if config["legacy_form"] == "reject":
-            print(message, file=sys.stderr)
-            failures = True
+            emit_error(message)
         else:
             print(f"warning: {message}", file=sys.stderr)
 
     committed, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
     if ledger_errors:
-        print_messages(ledger_errors)
-        failures = True
+        for message in ledger_errors:
+            emit_error(message)
     elif not errors:
         if sorted(record.identity() for record in generated) != sorted(
             record.identity() for record in committed
         ):
-            print("E_STALE_LEDGER committed ledger differs from a fresh scan", file=sys.stderr)
+            emit_error("E_STALE_LEDGER committed ledger differs from a fresh scan")
             if sorted(record.source_identity() for record in generated) == sorted(
                 record.source_identity() for record in committed
             ):
                 print("hint: ledger may need regeneration after id_length change", file=sys.stderr)
-            failures = True
 
     if config["doc_hierarchy"]:
         leaf = config["doc_hierarchy"][-1]
@@ -622,12 +677,10 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
         for record in implementation_records:
             prefix = handle_prefix(record.handle)
             if prefix != leaf and (prefix in config["doc_hierarchy"] or prefix == "V2M"):
-                print(
+                emit_error(
                     f"E_OFFLEAF_HANDLE {record.handle} at {record.path}:{record.line} "
-                    f"(expected leaf: {leaf})",
-                    file=sys.stderr,
+                    f"(expected leaf: {leaf})"
                 )
-                failures = True
         records_by_file: dict[str, list[LedgerRecord]] = defaultdict(list)
         for record in implementation_records:
             records_by_file[record.path].append(record)
@@ -645,45 +698,70 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
             for block in blocks:
                 handles = sorted({record.handle for record in block})
                 if len(handles) > 1:
-                    print(
+                    emit_error(
                         f"E_MULTI_HANDLE_EVIDENCE {file_path}:{block[0].line}-{block[-1].line} "
-                        f"has {len(handles)} handles: {', '.join(handles)}",
-                        file=sys.stderr,
+                        f"has {len(handles)} handles: {', '.join(handles)}"
                     )
-                    failures = True
 
     requested_level = getattr(args, "strict", None)
     strict_level = requested_level if requested_level is not None else config["strict_level"]
     if strict_level == "full":
         registry, registry_errors = read_registry(project_path(root, config["registry_path"]))
         if registry_errors:
-            print_messages(registry_errors)
-            failures = True
+            for message in registry_errors:
+                emit_error(message)
         else:
             registry_by_handle = {entry["handle"]: entry for entry in registry}
             for handle in sorted({record.handle for record in generated}):
                 entry = registry_by_handle.get(handle)
-                if entry is None or entry["type"] == "unknown":
-                    print(f"E_HANDLE_NOT_REGISTERED {handle}", file=sys.stderr)
-                    failures = True
+                if entry is None or entry.get("type") in {None, "unknown"}:
+                    emit_error(f"E_HANDLE_NOT_REGISTERED {handle}")
             for entry in registry:
                 source = entry.get("source")
                 if source and not (root / source).exists():
-                    print(
+                    emit_error(
                         f"E_REGISTRY_SOURCE_MISSING {entry['handle']} "
-                        f"(source: {source} not found)",
-                        file=sys.stderr,
+                        f"(source: {source} not found)"
                     )
-                    failures = True
-    return 1 if failures else 0
+    output_format = getattr(args, "format", "text")
+    if failures:
+        if output_format == "json":
+            print(json.dumps({"status": "fail", "errors": error_codes}))
+        else:
+            print(f"REQTRACE FAIL checks={len(error_codes)}", file=sys.stderr)
+            print(
+                "fix: python scripts/reqtrace.py generate && python scripts/reqtrace.py check --strict",
+                file=sys.stderr,
+            )
+        return 1
+
+    registry, _ = read_registry(project_path(root, config["registry_path"]))
+    buckets, _ = coverage_data(registry, committed)
+    summary = coverage_summary(buckets)
+    if output_format == "json":
+        print(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "registered": len(registry),
+                    "full": summary["full"],
+                    "partial": summary["partial"],
+                    "zero": summary["zero"],
+                }
+            )
+        )
+    else:
+        print(
+            f"REQTRACE OK registered={len(registry)} full={summary['full']} "
+            f"partial={summary['partial']} zero={summary['zero']}"
+        )
+    return 0
 
 # @reqtrace TRD-12
-def command_report(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
-    registry, registry_errors = read_registry(project_path(root, config["registry_path"]))
-    ledger, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
-    if registry_errors or ledger_errors:
-        print_messages([*registry_errors, *ledger_errors])
-        return 2
+def coverage_data(
+    registry: Iterable[dict[str, Any]], ledger: Iterable[LedgerRecord]
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+    """Build deterministic role-aware coverage entries from registry and ledger records."""
     records_by_handle: dict[str, list[LedgerRecord]] = defaultdict(list)
     for record in ledger:
         records_by_handle[record.handle].append(record)
@@ -692,7 +770,7 @@ def command_report(root: Path, config: dict[str, Any], args: argparse.Namespace)
     items: list[dict[str, Any]] = []
     for handle in sorted(set(registry_by_handle) | set(records_by_handle)):
         records = records_by_handle[handle]
-        entry = registry_by_handle.get(handle, {"handle": handle, "type": "unknown"})
+        entry = registry_by_handle.get(handle, {})
         kinds = sorted({record.kind for record in records})
         implementation = "implementation" in kinds
         verification = "verification" in kinds
@@ -708,7 +786,9 @@ def command_report(root: Path, config: dict[str, Any], args: argparse.Namespace)
         else:
             status = "none"
         item: dict[str, Any] = {
-            **entry,
+            "handle": handle,
+            "type": entry.get("type", "unknown"),
+            "source": entry.get("source"),
             "occurrences": len(records),
             "kinds": kinds,
             "kind_counts": {kind: sum(record.kind == kind for record in records) for kind in kinds},
@@ -725,8 +805,38 @@ def command_report(root: Path, config: dict[str, Any], args: argparse.Namespace)
             bucket = "zero"
         buckets[bucket].append(item)
         items.append(item)
+    return buckets, items
+
+
+def coverage_summary(buckets: dict[str, list[dict[str, Any]]]) -> dict[str, int]:
+    """Derive summary counts directly from coverage bucket lists."""
+    return {
+        "total": sum(len(buckets[bucket]) for bucket in ("full", "partial", "zero")),
+        "full": len(buckets["full"]),
+        "partial": len(buckets["partial"]),
+        "zero": len(buckets["zero"]),
+    }
+
+
+# @reqtrace TRD-12
+def command_report(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
+    registry, registry_errors = read_registry(project_path(root, config["registry_path"]))
+    ledger, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
+    if registry_errors or ledger_errors:
+        print_messages([*registry_errors, *ledger_errors])
+        return 2
+    buckets, items = coverage_data(registry, ledger)
     if args.format == "json":
-        print(json.dumps(buckets, indent=2))
+        print(
+            json.dumps(
+                {
+                    "schemaVersion": "2.1",
+                    "handles": buckets,
+                    "summary": coverage_summary(buckets),
+                },
+                indent=2,
+            )
+        )
         return 0
     if args.format == "github":
         print("| Handle | Implementation | Verification | Documentation | Status |")
@@ -826,6 +936,10 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--format", choices=("text", "json"), default="text")
     scan.add_argument("--diff", action="store_true", help="show annotations absent from the ledger")
     subcommands.add_parser("init", help="write starter local Reqtrace files")
+    register = subcommands.add_parser("register", help="append a validated handle to the registry")
+    register.add_argument("handle")
+    register.add_argument("--type")
+    register.add_argument("--source")
     generate = subcommands.add_parser("generate", help="write the canonical JSONL ledger")
     generate.add_argument(
         "--register-unknown", action="store_true", help="add unregistered handles as type unknown"
@@ -839,6 +953,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("ledger", "full"),
         help="use the configured policy, or specify ledger or full explicitly",
     )
+    check.add_argument("--format", choices=("text", "json"), default="text")
     report = subcommands.add_parser("report", help="report coverage from registry and ledger")
     report.add_argument("--format", choices=("text", "json", "github"), default="text")
     migrate = subcommands.add_parser(
@@ -866,6 +981,7 @@ def main(argv: list[str] | None = None) -> int:
         config = load_config(root)
         commands = {
             "scan": command_scan,
+            "register": command_register,
             "generate": command_generate,
             "render": command_render,
             "check": command_check,

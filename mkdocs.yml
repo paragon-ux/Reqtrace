@@ -2,5 +2,8 @@ site_name: Reqtrace
 nav:
   - Home: index.md
   - Reference: reference.md
+  - Schema: schema.md
+  - Hierarchy Patterns: hierarchy-patterns.md
+  - ADR: adr/0001-v2.1.5-core-boundaries.md
   - Examples: examples.md
   - Requirements: requirements.md

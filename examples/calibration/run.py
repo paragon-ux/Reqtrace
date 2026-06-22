@@ -62,7 +62,7 @@ def full_coverage(root: Path) -> None:
     require_exit(command(root, "generate"), 0)
     require_exit(command(root, "check", "--strict"), 0)
     payload = report(root)
-    full_handles = {entry["handle"] for entry in payload["full"]}
+    full_handles = {entry["handle"] for entry in payload["handles"]["full"]}
     if "TRD-1" not in full_handles:
         raise AssertionError(f"TRD-1 missing from full coverage: {payload}")
 
@@ -71,8 +71,8 @@ def partial_implementation_only(root: Path) -> None:
     require_exit(command(root, "generate"), 0)
     require_exit(command(root, "check", "--strict"), 0)
     payload = report(root)
-    partial_handles = {entry["handle"] for entry in payload["partial"]}
-    if "TRD-2" not in partial_handles or payload["full"]:
+    partial_handles = {entry["handle"] for entry in payload["handles"]["partial"]}
+    if "TRD-2" not in partial_handles or payload["handles"]["full"]:
         raise AssertionError(f"expected TRD-2 partial and no full coverage: {payload}")
 
 
@@ -106,7 +106,9 @@ def scan_diff(root: Path) -> None:
         records = json.loads(result.stdout)
     except json.JSONDecodeError as error:
         raise AssertionError(f"scan --diff did not return JSON:\n{result.stdout}") from error
-    if records != [{"handle": "TRD-7", "path": "src/widget.py", "line": 4}]:
+    if records != [
+        {"handle": "TRD-7", "path": "src/widget.py", "line": 4, "kind": None, "id": None}
+    ]:
         raise AssertionError(f"scan --diff returned unexpected records: {records}")
 
 
