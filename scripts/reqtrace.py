@@ -165,7 +165,7 @@ def starter_config(root: Path) -> dict[str, Any]:
     return config
 
 def project_path(root: Path, configured_path: str) -> Path:
-    candidate = (root / configured_path).resolve()
+    candidate = (root / configured_path.replace("\\", "/")).resolve()
     try:
         candidate.relative_to(root.resolve())
     except ValueError as error:
