@@ -11,6 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -217,7 +218,7 @@ class StabilizeTests(unittest.TestCase):
             self.assertEqual(json.loads(stdout.getvalue()), {"status": "fail", "errors": ["E_STALE_LEDGER"]})
             self.assertIn("E_STALE_LEDGER", stderr.getvalue())
 
-    def test_register_appends_optional_fields_and_prints_marker(self) -> None:
+    def test_register_appends_default_type_and_prints_marker(self) -> None:
         with self.make_root() as directory:
             root = Path(directory)
             config = self.config(root)
@@ -230,12 +231,33 @@ class StabilizeTests(unittest.TestCase):
                     0,
                 )
             entry = json.loads((root / "docs" / "handle-registry.jsonl").read_text(encoding="utf-8"))
-            self.assertEqual(entry, {"handle": "AUTH-LOGIN"})
+            self.assertEqual(entry, {"handle": "AUTH-LOGIN", "type": "unknown"})
             self.assertIn("REQTRACE REGISTERED AUTH-LOGIN", output.getvalue())
             self.assertIn(f"marker:   {MARKER} AUTH-LOGIN", output.getvalue())
             self.assertEqual(
                 reqtrace.command_check(root, config, SimpleNamespace(strict="ledger", format="text")), 0
             )
+
+    def test_register_default_unknown_type_remains_incomplete_for_strict_full(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(root / "src" / "auth.py", f"# {MARKER} AUTH-LOGIN\n")
+            config = self.config(root)
+            self.assertEqual(
+                reqtrace.command_register(
+                    root, config, SimpleNamespace(handle="AUTH-LOGIN", type=None, source=None)
+                ),
+                0,
+            )
+            self.assertEqual(
+                reqtrace.command_generate(root, config, SimpleNamespace(register_unknown=False)), 0
+            )
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self.assertEqual(
+                    reqtrace.command_check(root, config, SimpleNamespace(strict="full", format="text")), 1
+                )
+            self.assertIn("E_HANDLE_NOT_REGISTERED AUTH-LOGIN", stderr.getvalue())
 
     def test_register_rejects_duplicates_invalid_handles_and_missing_sources(self) -> None:
         with self.make_root() as directory:
@@ -267,6 +289,21 @@ class StabilizeTests(unittest.TestCase):
                     1,
                 )
             self.assertIn("E_REGISTRY_SOURCE_MISSING: docs/missing.md not found", stderr.getvalue())
+
+    def test_register_rejects_handles_outside_trace_grammar(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            config = self.config(root)
+            for handle in ("auth-login", "AUTH_LOGIN"):
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr):
+                    self.assertEqual(
+                        reqtrace.command_register(
+                            root, config, SimpleNamespace(handle=handle, type=None, source=None)
+                        ),
+                        1,
+                    )
+                self.assertIn("E_INVALID_HANDLE", stderr.getvalue())
 
     def test_register_writes_type_and_existing_source_when_requested(self) -> None:
         with self.make_root() as directory:
@@ -307,6 +344,187 @@ class StabilizeTests(unittest.TestCase):
             self.assertEqual(errors, [])
             self.assertEqual(entries[0]["parent"], "SRS-1")
             self.assertEqual(entries[0]["links"], ["ADR-001"])
+
+    def test_strict_full_success_summary_reuses_validated_registry(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(root / "src" / "auth.py", f"# {MARKER} AUTH-LOGIN\n")
+            config = self.config(root)
+            self.assertEqual(
+                reqtrace.command_generate(root, config, SimpleNamespace(register_unknown=False)), 0
+            )
+            validated = [{"handle": "AUTH-LOGIN", "type": "requirement"}]
+            mutated = [*validated, {"handle": "EXTRA-HANDLE", "type": "requirement"}]
+            calls: list[Path] = []
+
+            def changing_registry(path: Path) -> tuple[list[dict[str, object]], list[str]]:
+                calls.append(path)
+                return (validated if len(calls) == 1 else mutated), []
+
+            output = io.StringIO()
+            with patch.object(reqtrace, "read_registry", side_effect=changing_registry):
+                with contextlib.redirect_stdout(output):
+                    self.assertEqual(
+                        reqtrace.command_check(
+                            root, config, SimpleNamespace(strict="full", format="json")
+                        ),
+                        0,
+                    )
+            status = json.loads(output.getvalue())
+            self.assertEqual(status["registered"], 1)
+            self.assertEqual(len(calls), 1)
+
+    def test_check_reports_stale_ledger_even_when_scan_has_errors(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(
+                root / "src" / "auth.py",
+                f"# {MARKER} AUTH-LOGIN {MARKER} AUTH-LOGOUT\n",
+            )
+            self.write(
+                root / "docs" / "trace-ledger.jsonl",
+                json.dumps(
+                    {
+                        "handle": "AUTH-LOGIN",
+                        "id": "a001",
+                        "path": "src/auth.py",
+                        "line": 1,
+                        "kind": "implementation",
+                    }
+                )
+                + "\n",
+            )
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self.assertEqual(
+                    reqtrace.command_check(
+                        root, self.config(root), SimpleNamespace(strict="ledger", format="text")
+                    ),
+                    1,
+                )
+            self.assertIn("E_MULTIPLE_MARKERS_ON_LINE", stderr.getvalue())
+            self.assertIn("E_STALE_LEDGER", stderr.getvalue())
+
+    def test_bare_strict_parser_selects_full_validation(self) -> None:
+        args = reqtrace.build_parser().parse_args(["check", "--strict"])
+        self.assertEqual(args.strict, "full")
+
+    def test_check_json_reports_registry_parse_error_code(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(root / "docs" / "handle-registry.jsonl", "{BAD JSON\n")
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                self.assertEqual(
+                    reqtrace.command_check(
+                        root, self.config(root), SimpleNamespace(strict="full", format="json")
+                    ),
+                    1,
+                )
+            self.assertEqual(
+                json.loads(stdout.getvalue()),
+                {"status": "fail", "errors": ["E_REGISTRY_PARSE_ERROR"]},
+            )
+            self.assertIn("E_REGISTRY_PARSE_ERROR", stderr.getvalue())
+
+    def test_blank_registry_source_fails_strict_full(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(root / "src" / "auth.py", f"# {MARKER} AUTH-LOGIN\n")
+            self.write(
+                root / "docs" / "handle-registry.jsonl",
+                json.dumps({"handle": "AUTH-LOGIN", "type": "requirement", "source": ""}) + "\n",
+            )
+            config = self.config(root)
+            self.assertEqual(
+                reqtrace.command_generate(root, config, SimpleNamespace(register_unknown=False)), 0
+            )
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self.assertEqual(
+                    reqtrace.command_check(root, config, SimpleNamespace(strict="full", format="text")),
+                    1,
+                )
+            self.assertIn("E_REGISTRY_SOURCE_MISSING AUTH-LOGIN", stderr.getvalue())
+
+    def test_escaped_registry_source_fails_strict_full(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(root / "src" / "auth.py", f"# {MARKER} AUTH-LOGIN\n")
+            self.write(
+                root / "docs" / "handle-registry.jsonl",
+                json.dumps(
+                    {"handle": "AUTH-LOGIN", "type": "requirement", "source": "../outside.md"}
+                )
+                + "\n",
+            )
+            config = self.config(root)
+            self.assertEqual(
+                reqtrace.command_generate(root, config, SimpleNamespace(register_unknown=False)), 0
+            )
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self.assertEqual(
+                    reqtrace.command_check(root, config, SimpleNamespace(strict="full", format="text")),
+                    1,
+                )
+            self.assertIn("E_REGISTRY_SOURCE_MISSING AUTH-LOGIN", stderr.getvalue())
+            self.assertIn("escapes the repository", stderr.getvalue())
+
+    def test_register_reads_registry_once_before_append(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            registry_path = root / "docs" / "handle-registry.jsonl"
+            self.write(
+                registry_path,
+                json.dumps({"handle": "EXISTING", "type": "requirement"}) + "\n",
+            )
+            config = self.config(root)
+            original_read_text = Path.read_text
+            registry_reads = 0
+
+            def counting_read_text(path: Path, *args: object, **kwargs: object) -> str:
+                nonlocal registry_reads
+                if path == registry_path:
+                    registry_reads += 1
+                return original_read_text(path, *args, **kwargs)
+
+            with patch.object(Path, "read_text", counting_read_text):
+                self.assertEqual(
+                    reqtrace.command_register(
+                        root, config, SimpleNamespace(handle="AUTH-LOGIN", type=None, source=None)
+                    ),
+                    0,
+                )
+            self.assertEqual(registry_reads, 1)
+
+    def test_render_skips_write_when_ledger_block_is_current(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(
+                root / "docs" / "trace-ledger.jsonl",
+                json.dumps(
+                    {
+                        "handle": "AUTH-LOGIN",
+                        "id": "a001",
+                        "path": "src/auth.py",
+                        "line": 1,
+                        "kind": "implementation",
+                    }
+                )
+                + "\n",
+            )
+            self.write(
+                root / "docs" / "requirements.md",
+                "# AUTH-LOGIN\n\n"
+                "<!-- reqtrace:ledger:start handle=AUTH-LOGIN -->\n"
+                "- AUTH-LOGIN/a001/src/auth.py:1\n"
+                "<!-- reqtrace:ledger:end -->\n",
+            )
+            with patch.object(reqtrace, "atomic_write_text") as write_text:
+                self.assertEqual(reqtrace.command_render(root, self.config(root), SimpleNamespace()), 0)
+            write_text.assert_not_called()
 
 
 if __name__ == "__main__":

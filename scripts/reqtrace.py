@@ -351,14 +351,8 @@ def ledger_record_from_json(value: dict[str, Any]) -> LedgerRecord | None:
     return LedgerRecord(handle=handle, id=record_id, path=path, line=line, kind=kind)
 
 # @reqtrace TRD-6
-def read_registry(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
-    if not path.exists():
-        return [], []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError as error:
-        raise ReqtraceError(f"cannot read {path}: {error}") from error
-
+def parse_registry_text(path: Path, content: str) -> tuple[list[dict[str, Any]], list[str]]:
+    lines = content.splitlines()
     entries: list[dict[str, Any]] = []
     errors: list[str] = []
     handles: set[str] = set()
@@ -366,25 +360,45 @@ def read_registry(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
         try:
             value = json.loads(raw_line)
         except json.JSONDecodeError as error:
-            errors.append(f"registry parse error {path.as_posix()}:{line_number}: {error.msg}")
+            errors.append(
+                f"E_REGISTRY_PARSE_ERROR {path.as_posix()}:{line_number}: {error.msg}"
+            )
             continue
         if not isinstance(value, dict):
-            errors.append(f"registry parse error {path.as_posix()}:{line_number}: record must be an object")
+            errors.append(
+                f"E_REGISTRY_PARSE_ERROR {path.as_posix()}:{line_number}: record must be an object"
+            )
             continue
         handle = value.get("handle")
         entry_type = value.get("type")
         source = value.get("source")
         if (
             not isinstance(handle, str)
-            or not re.fullmatch(r"[A-Za-z0-9_-]+", handle)
+            or not HANDLE_RE.fullmatch(handle)
             or (entry_type is not None and (not isinstance(entry_type, str) or not entry_type))
             or (source is not None and not isinstance(source, str))
             or handle in handles
         ):
-            errors.append(f"registry parse error {path.as_posix()}:{line_number}: invalid record schema")
+            errors.append(
+                f"E_REGISTRY_PARSE_ERROR {path.as_posix()}:{line_number}: invalid record schema"
+            )
             continue
         handles.add(handle)
         entries.append(value)
+    return entries, errors
+
+def read_registry_with_text(path: Path) -> tuple[list[dict[str, Any]], list[str], str]:
+    if not path.exists():
+        return [], [], ""
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ReqtraceError(f"cannot read {path}: {error}") from error
+    entries, errors = parse_registry_text(path, content)
+    return entries, errors, content
+
+def read_registry(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    entries, errors, _ = read_registry_with_text(path)
     return entries, errors
 
 def register_unknown_handles(
@@ -460,12 +474,12 @@ def command_init(root: Path, _: argparse.Namespace) -> int:
 # @reqtrace TRD-7
 def command_register(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     handle = args.handle
-    if not isinstance(handle, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", handle):
-        print(f"E_INVALID_HANDLE: {handle!r} must match [A-Za-z0-9_-]+", file=sys.stderr)
+    if not isinstance(handle, str) or not HANDLE_RE.fullmatch(handle):
+        print(f"E_INVALID_HANDLE: {handle!r} must match {HANDLE_PATTERN}", file=sys.stderr)
         return 1
 
     registry_path = project_path(root, config["registry_path"])
-    registry, errors = read_registry(registry_path)
+    registry, errors, original = read_registry_with_text(registry_path)
     if errors:
         print_messages(errors)
         return 2
@@ -478,12 +492,9 @@ def command_register(root: Path, config: dict[str, Any], args: argparse.Namespac
         print(f"E_REGISTRY_SOURCE_MISSING: {source} not found", file=sys.stderr)
         return 1
 
-    entry: dict[str, str] = {"handle": handle}
-    if args.type is not None:
-        entry["type"] = args.type
+    entry: dict[str, str] = {"handle": handle, "type": args.type or "unknown"}
     if source is not None:
         entry["source"] = source
-    original = registry_path.read_text(encoding="utf-8") if registry_path.exists() else ""
     if original and not original.endswith("\n"):
         original += "\n"
     atomic_write_text(registry_path, original + json.dumps(entry, separators=(", ", ": ")) + "\n")
@@ -607,7 +618,7 @@ def render_documents(root: Path, config: dict[str, Any], records: Iterable[Ledge
         except OSError as error:
             raise ReqtraceError(f"cannot read {path.relative_to(root).as_posix()}: {error}") from error
         rendered: list[str] = []
-        changed = False
+        found_block = False
         index = 0
         while index < len(lines):
             start = START_BLOCK_RE.match(lines[index].rstrip("\r\n"))
@@ -625,13 +636,14 @@ def render_documents(root: Path, config: dict[str, Any], records: Iterable[Ledge
                 raise ReqtraceError(
                     f"unterminated ledger block for {handle} in {path.relative_to(root).as_posix()}"
                 )
+            found_block = True
             for record in sorted(records_by_handle[handle], key=lambda item: (item.path, item.line)):
                 rendered.append(f"- {record.handle}/{record.id}/{record.path}:{record.line}\n")
             rendered.append(lines[end_index])
             index = end_index + 1
-            changed = True
-        if changed:
-            atomic_write_text(path, "".join(rendered))
+        rendered_content = "".join(rendered)
+        if found_block and rendered_content != "".join(lines):
+            atomic_write_text(path, rendered_content)
 
 # @reqtrace TRD-8
 def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
@@ -661,7 +673,7 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
     if ledger_errors:
         for message in ledger_errors:
             emit_error(message)
-    elif not errors:
+    else:
         if sorted(record.identity() for record in generated) != sorted(
             record.identity() for record in committed
         ):
@@ -705,20 +717,37 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
 
     requested_level = getattr(args, "strict", None)
     strict_level = requested_level if requested_level is not None else config["strict_level"]
+    registry_for_summary: list[dict[str, Any]] | None = None
     if strict_level == "full":
-        registry, registry_errors = read_registry(project_path(root, config["registry_path"]))
+        registry_for_summary, registry_errors = read_registry(project_path(root, config["registry_path"]))
         if registry_errors:
             for message in registry_errors:
                 emit_error(message)
         else:
-            registry_by_handle = {entry["handle"]: entry for entry in registry}
+            registry_by_handle = {entry["handle"]: entry for entry in registry_for_summary}
             for handle in sorted({record.handle for record in generated}):
                 entry = registry_by_handle.get(handle)
                 if entry is None or entry.get("type") in {None, "unknown"}:
                     emit_error(f"E_HANDLE_NOT_REGISTERED {handle}")
-            for entry in registry:
+            for entry in registry_for_summary:
                 source = entry.get("source")
-                if source and not (root / source).exists():
+                if source is None:
+                    continue
+                if not source:
+                    emit_error(
+                        f"E_REGISTRY_SOURCE_MISSING {entry['handle']} "
+                        f"(source: blank)"
+                    )
+                    continue
+                try:
+                    source_path = project_path(root, source)
+                except ReqtraceError as error:
+                    emit_error(
+                        f"E_REGISTRY_SOURCE_MISSING {entry['handle']} "
+                        f"(source: {source} invalid: {error})"
+                    )
+                    continue
+                if not source_path.exists():
                     emit_error(
                         f"E_REGISTRY_SOURCE_MISSING {entry['handle']} "
                         f"(source: {source} not found)"
@@ -735,15 +764,16 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
             )
         return 1
 
-    registry, _ = read_registry(project_path(root, config["registry_path"]))
-    buckets, _ = coverage_data(registry, committed)
+    if registry_for_summary is None:
+        registry_for_summary, _ = read_registry(project_path(root, config["registry_path"]))
+    buckets, _ = coverage_data(registry_for_summary, committed)
     summary = coverage_summary(buckets)
     if output_format == "json":
         print(
             json.dumps(
                 {
                     "status": "ok",
-                    "registered": len(registry),
+                    "registered": len(registry_for_summary),
                     "full": summary["full"],
                     "partial": summary["partial"],
                     "zero": summary["zero"],
@@ -752,7 +782,7 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
         )
     else:
         print(
-            f"REQTRACE OK registered={len(registry)} full={summary['full']} "
+            f"REQTRACE OK registered={len(registry_for_summary)} full={summary['full']} "
             f"partial={summary['partial']} zero={summary['zero']}"
         )
     return 0
@@ -949,9 +979,9 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument(
         "--strict",
         nargs="?",
-        const="ledger",
+        const="full",
         choices=("ledger", "full"),
-        help="use the configured policy, or specify ledger or full explicitly",
+        help="run full validation, or specify ledger or full explicitly",
     )
     check.add_argument("--format", choices=("text", "json"), default="text")
     report = subcommands.add_parser("report", help="report coverage from registry and ledger")

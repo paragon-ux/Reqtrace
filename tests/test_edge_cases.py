@@ -62,17 +62,17 @@ class EdgeCaseTests(unittest.TestCase):
         return json.dumps({"handle": handle, "id": id, "path": path, "line": line, "kind": kind}) + "\n"
 
     # ------------------------------------------------------------------
-    # BUG-1: bare --strict is a no-op without const="ledger"
+    # BUG-1: bare --strict selects full validation
     # ------------------------------------------------------------------
 
-    def test_bug1_bare_strict_flag_produces_ledger_not_none(self) -> None:
-        """After the fix, bare --strict must parse to "ledger", not None."""
+    def test_bug1_bare_strict_flag_produces_full_not_none(self) -> None:
+        """Bare --strict must parse to "full", not None."""
         parser = reqtrace.build_parser()
         args = parser.parse_args(["check", "--strict"])
         self.assertEqual(
             args.strict,
-            "ledger",
-            "bare --strict must produce 'ledger' (const); got None means BUG-1 is unfixed",
+            "full",
+            "bare --strict must produce 'full' (const); got None means the flag is ignored",
         )
 
     def test_bug1_strict_equals_full_still_works(self) -> None:
@@ -87,30 +87,27 @@ class EdgeCaseTests(unittest.TestCase):
         args = parser.parse_args(["check"])
         self.assertIsNone(args.strict)
 
-    def test_bug1_bare_strict_on_fresh_ledger_exits_0(self) -> None:
+    def test_bug1_bare_strict_on_fresh_ledger_enforces_registry(self) -> None:
         """
         Bare --strict on a project with a fresh ledger and no registry must
-        exit 0 (ledger-level check passes) — not silently use config default.
+        exit 1 because full validation requires registry metadata.
         """
         with self.make_root() as directory:
             root = Path(directory)
             self.write(root / "src" / "feature.py", f"# {MARKER} ADR-0012\n")
             config = self.config(root)
             reqtrace.command_generate(root, config, SimpleNamespace(register_unknown=False))
-            # BUG-1: if const is missing, args.strict=None falls through to
-            # config["strict_level"]="ledger" by accident — same result, but
-            # --strict=full would also silently do nothing. We test the parse
-            # value directly (above) and verify the function call honours it.
-            rc = reqtrace.command_check(root, config, SimpleNamespace(strict="ledger"))
-            self.assertEqual(rc, 0)
+            # Verify the function honours the parser's bare --strict value.
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                rc = reqtrace.command_check(root, config, SimpleNamespace(strict="full"))
+            self.assertEqual(rc, 1)
+            self.assertIn("E_HANDLE_NOT_REGISTERED", stderr.getvalue())
 
-    def test_bug1_bare_strict_does_not_enforce_full_when_config_is_ledger(self) -> None:
+    def test_bug1_bare_strict_enforces_full_when_config_is_ledger(self) -> None:
         """
-        Config strict_level=ledger + bare --strict must exit 0 even with an
-        unregistered handle. If the fix naively escalates to config level when
-        requested_level is None (pre-fix behaviour), this would still pass; the
-        real trap is when config="full" and the user passes bare --strict to
-        downgrade to ledger. Test that too.
+        Config strict_level=ledger + bare --strict must still run full
+        validation and reject an unregistered handle.
         """
         with self.make_root() as directory:
             root = Path(directory)
@@ -118,13 +115,16 @@ class EdgeCaseTests(unittest.TestCase):
             # config has no handle-registry entries for UNREGISTERED-HANDLE
             config = self.config(root)
             reqtrace.command_generate(root, config, SimpleNamespace(register_unknown=False))
-            rc = reqtrace.command_check(root, config, SimpleNamespace(strict="ledger"))
-            self.assertEqual(rc, 0)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                rc = reqtrace.command_check(root, config, SimpleNamespace(strict="full"))
+            self.assertEqual(rc, 1)
+            self.assertIn("E_HANDLE_NOT_REGISTERED", stderr.getvalue())
 
-    def test_bug1_full_config_with_bare_strict_flag_uses_ledger_not_full(self) -> None:
+    def test_bug1_explicit_ledger_can_override_full_config(self) -> None:
         """
-        When config has strict_level=full, bare --strict=ledger (from the
-        const after the fix) must win and NOT enforce registry check.
+        When config has strict_level=full, explicit --strict=ledger must win
+        and NOT enforce registry checks.
         """
         with self.make_root() as directory:
             root = Path(directory)
