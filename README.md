@@ -6,7 +6,7 @@ Reqtrace is a grep-native convention for tracing implementation evidence to an e
 
 Reqtrace starts after that handle already exists. It does not create, rename, split, supersede, or interpret upstream artifacts.
 
-Current release: [`v2.1.5`](https://github.com/paragon-ux/Reqtrace/releases/tag/v2.1.5).
+Current release: [`v2.1.6`](https://github.com/paragon-ux/Reqtrace/releases/tag/v2.1.6).
 
 ## One Marker, One Record
 
@@ -45,7 +45,7 @@ python scripts/reqtrace.py check --strict
 3. Run `python scripts/reqtrace.py render` to refresh Markdown ledger blocks.
 4. Run `python scripts/reqtrace.py check --strict` before committing.
 
-`check --strict` is enforced in the supplied pre-commit hook and GitHub Actions workflow. It detects stale ledgers, malformed ledger records, legacy annotations, and ambiguous markers. Use `check --strict=full` to also require complete registry metadata.
+`check --strict` is enforced in the supplied pre-commit hook and GitHub Actions workflow. It detects stale ledgers, malformed ledger records, legacy annotations, and ambiguous markers. Use `check --strict=full` to also require complete registry metadata. Use `check --strict --format json` when an agent or CI consumer needs machine-readable status.
 
 ## Commands
 
@@ -59,16 +59,18 @@ python scripts/reqtrace.py check --strict
 | `python scripts/reqtrace.py generate` | Write the canonical JSONL ledger. |
 | `python scripts/reqtrace.py render` | Refresh Markdown ledger blocks. |
 | `python scripts/reqtrace.py check --strict` | Use the configured strict policy (`ledger` by default). |
+| `python scripts/reqtrace.py check --strict --format json` | Emit machine-readable pass/fail status for automation. |
 | `python scripts/reqtrace.py check --strict=ledger` | Enforce ledger freshness only. |
 | `python scripts/reqtrace.py check --strict=full` | Enforce ledger freshness and registry completeness. |
 | `python scripts/reqtrace.py report --format github` | Emit a Markdown coverage table. |
+| `python scripts/reqtrace.py report --format json` | Emit machine-readable coverage with schema version, handle buckets, and summary counts. |
 | `python scripts/reqtrace.py migrate --dry-run` | Inspect deprecated V1 transition migration. |
 
 Use `report --format json` for machine-readable coverage. A handle is full when it has implementation evidence, partial when it has only non-implementation evidence, and zero when it has no ledger records; each entry also lists observed role kinds and status.
 
 ## What Reqtrace Delegates
 
-Reqtrace v2.1.5 stabilizes the evidence convention. It does not replace every
+Reqtrace v2.1.6 preserves the evidence convention. It does not replace every
 surrounding workflow.
 
 - **Search / command compression:** use `grep`, `rg`, or RTK.

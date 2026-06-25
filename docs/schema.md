@@ -1,8 +1,9 @@
 # JSON Contracts
 
-Reqtrace exposes four stable JSON contracts. Field names and types do not change
-within a `schemaVersion`; command output uses `--format json` and the ledger and
-registry remain JSON Lines files.
+Reqtrace exposes stable JSON contracts for scan annotations, generated ledgers,
+coverage reports, registry records, and check status. Field names and types do
+not change within a `schemaVersion`; command output uses `--format json` and the
+ledger and registry remain JSON Lines files.
 
 ## Annotation (`scan --format json`)
 
@@ -64,16 +65,46 @@ Each JSONL line describes one upstream handle.
 | `parent` | string\|absent | Reserved immediate-parent handle in a vertical hierarchy. |
 | `links` | array\|absent | Reserved peer-handle relationships. |
 
-Fields are absent rather than `null` when unavailable. In v2.1.5, `register`
-writes `handle`, then `type` and `source` only when supplied. The register does not write `parent` or `links`.
+Fields are absent rather than `null` when unavailable. In v2.1.6, `register`
+writes `handle`, then `type` and `source` only when supplied.
+`register` does not write `parent` or `links`.
+
 Reqtrace preserves reserved relationship fields already in
 the registry, but `check` does not infer, require, or validate their semantics.
 Tools, agents, and users may add those fields directly. Future releases may add
 CLI support after real-world relationship usage establishes the right model.
 
 > **Reserved relationship fields:** `parent` and `links` are deliberately
-> reserved but unenforced in v2.1.5. Downstream tools can traverse them without
+> reserved but unenforced in v2.1.6. Downstream tools can traverse them without
 > forcing Reqtrace core to choose a hierarchy model prematurely.
+
+## Check Status (`check --format json`)
+
+`check --format json` emits a single JSON object on stdout. The exit
+code reflects the check result independently; both should be read.
+
+Success:
+
+```json
+{
+  "status": "ok",
+  "registered": 12,
+  "full": 1,
+  "partial": 0,
+  "zero": 11
+}
+```
+
+Failure:
+
+```json
+{
+  "status": "fail",
+  "errors": [
+    "E_TRACE_DRIFT"
+  ]
+}
+```
 
 ## Exit Codes
 
@@ -81,3 +112,4 @@ CLI support after real-world relationship usage establishes the right model.
 | --- | --- |
 | 0 | Command succeeded; `check` passed or a generated file was written. |
 | 1 | A validation failed, such as `check` drift, a duplicate handle, or a missing source. |
+| 2 | Tool/configuration error, malformed project state, unreadable configured file, invalid registry/ledger parse, or other non-validation execution failure. |
