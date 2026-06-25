@@ -110,8 +110,8 @@ Failure:
 JSON contract; it is intended for operator and agent confirmation only.
 
 ```text
-REQTRACE REGISTERED AUTH-LOGIN
-marker:   &#64;reqtrace AUTH-LOGIN
+REQTRACE REGISTERED AUTH-SESSION-ROTATION
+marker:   @reqtrace AUTH-SESSION-ROTATION
 registry: docs/handle-registry.jsonl
 ```
 
