@@ -121,7 +121,7 @@ class ReqtraceCliTests(unittest.TestCase):
         self.assertEqual(sorted(set(tried_lengths)), list(range(10, 17)))
         self.assertEqual(errors, ["E_ID_COLLISION unable to disambiguate occurrence IDs at 16 hex characters"])
 
-    def test_check_omits_stale_error_when_scan_has_collision(self) -> None:
+    def test_check_reports_stale_error_when_scan_has_collision(self) -> None:
         with self.make_root() as directory:
             root = Path(directory)
             self.write(
@@ -155,7 +155,7 @@ class ReqtraceCliTests(unittest.TestCase):
             finally:
                 reqtrace.short_id = original_short_id
             self.assertIn("E_ID_COLLISION", output.getvalue())
-            self.assertNotIn("E_STALE_LEDGER", output.getvalue())
+            self.assertIn("E_STALE_LEDGER", output.getvalue())
 
     def test_report_buckets_zero_and_partial_coverage(self) -> None:
         with self.make_root() as directory:
@@ -549,7 +549,7 @@ class ReqtraceCliTests(unittest.TestCase):
             original_directory = Path.cwd()
             try:
                 os.chdir(root / "src")
-                self.assertEqual(reqtrace.main(["check", "--strict"]), 0)
+                self.assertEqual(reqtrace.main(["check", "--strict=ledger"]), 0)
             finally:
                 os.chdir(original_directory)
 
@@ -780,7 +780,7 @@ class ReqtraceCliTests(unittest.TestCase):
             )
             self.assertEqual(reqtrace.command_check(root, config, SimpleNamespace(strict=None)), 1)
 
-    def test_bare_strict_uses_configured_full_policy(self) -> None:
+    def test_bare_strict_runs_full_policy(self) -> None:
         with self.make_root() as directory:
             root = Path(directory)
             self.write(root / "src" / "feature.py", f"# {MARKER} ADR-0012\n")
@@ -790,8 +790,8 @@ class ReqtraceCliTests(unittest.TestCase):
                 reqtrace.command_generate(root, config, SimpleNamespace(register_unknown=False)), 0
             )
             args = reqtrace.build_parser().parse_args(["check", "--strict"])
-            self.assertEqual(args.strict, "ledger")
-            self.assertEqual(reqtrace.command_check(root, config, args), 0)
+            self.assertEqual(args.strict, "full")
+            self.assertEqual(reqtrace.command_check(root, config, args), 1)
 
     def test_migrate_prints_deprecation_notice(self) -> None:
         with self.make_root() as directory:
