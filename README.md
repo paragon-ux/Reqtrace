@@ -22,9 +22,21 @@ The canonical ledger is `docs/trace-ledger.jsonl`: a generated, sorted JSON Line
 
 ## Marker Semantics
 
-Reqtrace markers are evidence annotations, not explanatory comments. Use `@reqtrace <HANDLE>` to connect code, tests, docs, and artifacts to upstream handles. Do not use markers as a substitute for comments that explain intent, invariants, tradeoffs, surprising logic, security assumptions, or maintenance hazards. When adding markers to existing code, preserve existing explanatory comments. If a code path needed a comment before annotation, it still needs one after.
+Reqtrace markers are evidence annotations, not explanatory comments. Use `@reqtrace <HANDLE>` to connect code, tests, docs, and artifacts to upstream handles.
 
-Reqtrace does not dogfood production source by default. The project uses markers in calibration fixtures and examples to test and demonstrate the evidence convention. Production code should only carry `@reqtrace` markers when tied to meaningful upstream requirements. Calibration fixtures are scanner/report/check fixtures, not production annotation style guides.
+Do not use markers as a substitute for comments that explain intent, invariants, tradeoffs, surprising logic, security assumptions, or maintenance hazards. When adding markers to existing code, preserve existing explanatory comments. If a code path needed a comment before annotation, it still needs one after.
+
+The project uses markers in calibration fixtures and examples to test and demonstrate the evidence convention. Production code should only carry `@reqtrace` markers when tied to meaningful upstream requirements. Calibration fixtures are scanner/report/check fixtures, not production annotation style guides.
+
+## Quickstart
+
+```bash
+python scripts/reqtrace.py init
+python scripts/reqtrace.py register AUTH-LOGIN --type requirement --source docs/requirements.md
+# Add: @reqtrace AUTH-LOGIN
+python scripts/reqtrace.py generate
+python scripts/reqtrace.py check --strict
+```
 
 ## Workflow
 
@@ -40,6 +52,7 @@ Reqtrace does not dogfood production source by default. The project uses markers
 | Command | Purpose |
 | --- | --- |
 | `python scripts/reqtrace.py init` | Create a starter config, empty registry, and empty ledger from detected project directories. |
+| `python scripts/reqtrace.py register <HANDLE> [--type TYPE] [--source PATH]` | Add a handle to the registry and print the marker to place. |
 | `python scripts/reqtrace.py scan` | Print annotations for diagnosis. |
 | `python scripts/reqtrace.py scan --format json` | Emit annotation objects for automation. |
 | `python scripts/reqtrace.py scan --diff` | Show source annotations absent from the committed ledger. |
@@ -82,8 +95,8 @@ The optional V1 legacy form is recognized during the transition and configured b
 ## Examples
 
 - **[examples/refresh-token/](examples/refresh-token/)** — Full walkthrough:
-  two source files, one test, and a rendered ledger block for a token-rotation
-  requirement.
+  source files, tests, explanatory comments, trace markers, and a rendered
+  ledger block for a token-rotation requirement.
 - **[examples/calibration/](examples/calibration/)** — Seven scenario fixtures
   proving every documented claim. Run `python examples/calibration/run.py` to
   verify.
