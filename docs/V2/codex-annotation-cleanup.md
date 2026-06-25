@@ -137,6 +137,8 @@ etc. Delete all of them unconditionally wherever they appear.
    (DRD > ARD > BRD).
 3. **Delete all V2M-\* annotations unconditionally.**
 4. **Do not change any function signatures or logic.**
+5. **Preserve explanatory comments.** When removing markers, check whether
+   adjacent explanatory comments should be preserved.
 
 ### Cleanup table
 

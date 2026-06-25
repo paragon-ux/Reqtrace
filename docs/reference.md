@@ -37,7 +37,7 @@ For moved files, run `generate` and `render`; do not edit the ledger manually.
 
 ## Self-Tracing
 
-Reqtrace traces its own implementation as a case study. Generated occurrence IDs and positional diffs show evidence location only; they do not validate requirement meaning.
+Reqtrace traces its own implementation as a case study. The `TRD-*` markers in `scripts/reqtrace.py` demonstrate the evidence convention on the tool's own codebase. Generated occurrence IDs and positional diffs show evidence location only; they do not validate requirement meaning. This self-tracing is a demonstration, not a recommendation for production self-tracing without meaningful upstream requirements.
 
 ## Document Hierarchy Enforcement
 

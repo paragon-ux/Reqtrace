@@ -1,5 +1,6 @@
 function revokePreviousRefreshToken(store, rotatedSession) {
   // @reqtrace AUTH-SESSION-ROTATION
+  // Copy the rotated session and mark the retired token unusable for downstream checks.
   store.revokedTokens.add(rotatedSession.previousRefreshToken);
 
   return {

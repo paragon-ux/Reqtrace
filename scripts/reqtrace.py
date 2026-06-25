@@ -196,6 +196,7 @@ def is_excluded(root: Path, path: Path, excluded_dirs: set[str]) -> bool:
     return any(part in excluded_dirs for part in path.relative_to(root).parts)
 
 # @reqtrace TRD-3
+# Scanning is intentionally conservative: skip excluded/generated files, record diagnostics, and keep unreadable binaries out of the ledger.
 def scan_repository(root: Path, config: dict[str, Any]) -> ScanResult:
     trace_re, legacy_re = compile_patterns(config["marker"])
     excluded_dirs = set(config["excluded_dirs"])
@@ -646,6 +647,7 @@ def render_documents(root: Path, config: dict[str, Any], records: Iterable[Ledge
             atomic_write_text(path, rendered_content)
 
 # @reqtrace TRD-8
+# Checks accumulate independent failures before choosing an exit code so callers see every actionable drift source.
 def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, generated, errors = scan_records(root, config)
     failures = False
