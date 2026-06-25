@@ -530,7 +530,6 @@ def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -
         else:
             committed_identities = {record.source_identity() for record in committed}
             records = [record for record in records if record.source_identity() not in committed_identities]
-    output_records = sorted(records, key=lambda record: (record.handle, record.path, record.line))
     if output_format == "json":
         committed_by_source = {record.source_identity(): record for record in committed}
         print(
@@ -547,7 +546,7 @@ def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -
                         if record.source_identity() in committed_by_source
                         else None,
                     }
-                    for record in output_records
+                    for record in records
                 ],
                 indent=2,
             )
@@ -555,7 +554,7 @@ def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -
         print_messages(errors)
         return 0
     grouped: dict[str, list[LedgerRecord]] = defaultdict(list)
-    for record in output_records:
+    for record in records:
         grouped[record.handle].append(record)
     if not grouped:
         total = len(scan.occurrences) + len(scan.legacy_occurrences)
