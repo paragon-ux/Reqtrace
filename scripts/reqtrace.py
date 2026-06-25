@@ -16,7 +16,6 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Iterable
 
-# @reqtrace TRD-1
 DEFAULT_CONFIG: dict[str, Any] = {
     "marker": "@reqtrace",
     "id_length": 4,
@@ -102,7 +101,6 @@ class ScanResult:
 class ReqtraceError(Exception):
     """A configuration or file-system failure that maps to exit code 2."""
 
-# @reqtrace TRD-2
 def load_config(root: Path) -> dict[str, Any]:
     config = copy.deepcopy(DEFAULT_CONFIG)
     config_path = root / ".reqtrace.json"
@@ -195,7 +193,6 @@ def handle_prefix(handle: str) -> str:
 def is_excluded(root: Path, path: Path, excluded_dirs: set[str]) -> bool:
     return any(part in excluded_dirs for part in path.relative_to(root).parts)
 
-# @reqtrace TRD-3
 # Scanning is intentionally conservative: skip excluded/generated files, record diagnostics, and keep unreadable binaries out of the ledger.
 def scan_repository(root: Path, config: dict[str, Any]) -> ScanResult:
     trace_re, legacy_re = compile_patterns(config["marker"])
@@ -256,7 +253,6 @@ def role_for_path(relative_path: str, role_map: dict[str, str]) -> str:
             return kind
     return "unknown"
 
-# @reqtrace TRD-4
 def short_id(path: str, line: int, length: int = 4) -> str:
     digest = hashlib.sha256(f"{path}:{line}".encode("utf-8")).hexdigest()
     return digest[:length]
@@ -283,7 +279,6 @@ def records_from_occurrences(
         length += 1
     return [], [f"E_ID_COLLISION unable to disambiguate occurrence IDs at {MAX_ID_LENGTH} hex characters"]
 
-# @reqtrace TRD-5
 def write_ledger(path: Path, records: Iterable[LedgerRecord]) -> None:
     ordered = sorted(records, key=lambda item: (item.handle, item.path, item.line))
     content = "".join(
@@ -351,7 +346,6 @@ def ledger_record_from_json(value: dict[str, Any]) -> LedgerRecord | None:
         return None
     return LedgerRecord(handle=handle, id=record_id, path=path, line=line, kind=kind)
 
-# @reqtrace TRD-6
 def parse_registry_text(path: Path, content: str) -> tuple[list[dict[str, Any]], list[str]]:
     lines = content.splitlines()
     entries: list[dict[str, Any]] = []
@@ -472,7 +466,6 @@ def command_init(root: Path, _: argparse.Namespace) -> int:
     return 0
 
 
-# @reqtrace TRD-7
 def command_register(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     handle = args.handle
     if not isinstance(handle, str) or not HANDLE_RE.fullmatch(handle):
@@ -504,7 +497,6 @@ def command_register(root: Path, config: dict[str, Any], args: argparse.Namespac
     print(f"registry: {config['registry_path']}")
     return 0
 
-# @reqtrace TRD-7
 def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, records, errors = scan_records(root, config)
     diff = getattr(args, "diff", False)
@@ -562,7 +554,6 @@ def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -
     print_messages(errors)
     return 0
 
-# @reqtrace TRD-7
 def command_generate(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, records, errors = scan_records(root, config)
     if errors:
@@ -589,7 +580,6 @@ def command_generate(root: Path, config: dict[str, Any], args: argparse.Namespac
             )
     return 0
 
-# @reqtrace TRD-7
 def command_render(root: Path, config: dict[str, Any], _: argparse.Namespace) -> int:
     ledger_path = project_path(root, config["ledger_path"])
     records, errors = read_ledger(ledger_path)
@@ -646,7 +636,6 @@ def render_documents(root: Path, config: dict[str, Any], records: Iterable[Ledge
         if found_block and rendered_content != "".join(lines):
             atomic_write_text(path, rendered_content)
 
-# @reqtrace TRD-8
 # Checks accumulate independent failures before choosing an exit code so callers see every actionable drift source.
 def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     scan, generated, errors = scan_records(root, config)
@@ -789,7 +778,6 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
         )
     return 0
 
-# @reqtrace TRD-12
 def coverage_data(
     registry: Iterable[dict[str, Any]], ledger: Iterable[LedgerRecord]
 ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
@@ -850,7 +838,6 @@ def coverage_summary(buckets: dict[str, list[dict[str, Any]]]) -> dict[str, int]
     }
 
 
-# @reqtrace TRD-12
 def command_report(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     registry, registry_errors = read_registry(project_path(root, config["registry_path"]))
     ledger, ledger_errors = read_ledger(project_path(root, config["ledger_path"]))
@@ -910,7 +897,6 @@ def read_legacy_ledger(root: Path) -> list[tuple[str, str, str]]:
             entries.append(match.groups())
     return entries
 
-# @reqtrace TRD-9
 def command_migrate(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     print(
         "warning: migrate is deprecated V1 transition support; use only for legacy annotations.",
@@ -960,7 +946,6 @@ def command_migrate(root: Path, config: dict[str, Any], args: argparse.Namespace
     print_messages(warnings)
     return 1 if warnings else 0
 
-# @reqtrace TRD-7
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Operate the grep-native Reqtrace ledger.")
     subcommands = parser.add_subparsers(dest="command", required=True)

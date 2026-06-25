@@ -24,7 +24,7 @@ The canonical ledger is `docs/trace-ledger.jsonl`: a generated, sorted JSON Line
 
 Reqtrace markers are evidence annotations, not explanatory comments. Use `@reqtrace <HANDLE>` to connect code, tests, docs, and artifacts to upstream handles. Do not use markers as a substitute for comments that explain intent, invariants, tradeoffs, surprising logic, security assumptions, or maintenance hazards. When adding markers to existing code, preserve existing explanatory comments. If a code path needed a comment before annotation, it still needs one after.
 
-Reqtrace does not dogfood production source by default. The project uses markers in calibration fixtures and examples to test and demonstrate the evidence convention. The self-tracing markers in `scripts/reqtrace.py` are a case study demonstrating the tool on its own codebase; they are not a recommendation for production self-tracing. Production code should only carry `@reqtrace` markers when tied to meaningful upstream requirements. Calibration fixtures are scanner/report/check fixtures, not production annotation style guides.
+Reqtrace does not dogfood production source by default. The project uses markers in calibration fixtures and examples to test and demonstrate the evidence convention. Production code should only carry `@reqtrace` markers when tied to meaningful upstream requirements. Calibration fixtures are scanner/report/check fixtures, not production annotation style guides.
 
 ## Workflow
 

@@ -35,9 +35,9 @@ For moved files, run `generate` and `render`; do not edit the ledger manually.
 `register <HANDLE> [--type TYPE] [--source PATH]` appends one validated registry record and prints a paste-ready marker.
 `migrate` is deprecated V1 transition support. The default `legacy_form` policy is `reject`.
 
-## Self-Tracing
+## Production Source
 
-Reqtrace traces its own implementation as a case study. The `TRD-*` markers in `scripts/reqtrace.py` demonstrate the evidence convention on the tool's own codebase. Generated occurrence IDs and positional diffs show evidence location only; they do not validate requirement meaning. This self-tracing is a demonstration, not a recommendation for production self-tracing without meaningful upstream requirements.
+Reqtrace production source is not self-traced by default. Production code should only carry `@reqtrace` markers when they point to meaningful upstream requirement text. Calibration fixtures and recommended examples carry the scanner, report, check, and walkthrough demonstrations.
 
 ## Document Hierarchy Enforcement
 

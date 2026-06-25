@@ -9,7 +9,7 @@ Reqtrace is intentionally small. Keep it grep-native.
 - Use `@reqtrace <HANDLE>` near implementation or test evidence. One marker per line.
 - Do not add ordinals, `@file`, claims, parent fields, wiki links, JSON refs, or custom hook names.
 - If no registry entry exists for the handle, ask before annotating; do not silently register it.
-- When adding a marker, preserve any existing explanatory comment. Do not use a marker as a substitute for comments that explain intent, invariants, or security assumptions.
+- When adding a `@reqtrace` marker, preserve existing explanatory comments. Do not use a marker as a substitute for comments that explain intent, invariants, edge cases, tradeoffs, or security assumptions.
 - If the target function has nontrivial logic and no existing explanatory comment, note that an explanatory comment is also needed alongside the marker.
 
 ## Scenario 2: Running and Interpreting the Validator
