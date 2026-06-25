@@ -47,6 +47,21 @@ STARTER_ROLE_MAP = {
 }
 MAX_ID_LENGTH = 16
 
+E_AMBIGUOUS_MARKER = "E_AMBIGUOUS_MARKER"
+E_DUPLICATE_HANDLE = "E_DUPLICATE_HANDLE"
+E_HANDLE_NOT_REGISTERED = "E_HANDLE_NOT_REGISTERED"
+E_ID_COLLISION = "E_ID_COLLISION"
+E_INIT_EXISTS = "E_INIT_EXISTS"
+E_INVALID_HANDLE = "E_INVALID_HANDLE"
+E_LEDGER_PARSE = "E_LEDGER_PARSE"
+E_LEGACY_FORM = "E_LEGACY_FORM"
+E_MULTI_HANDLE_EVIDENCE = "E_MULTI_HANDLE_EVIDENCE"
+E_MULTIPLE_MARKERS_ON_LINE = "E_MULTIPLE_MARKERS_ON_LINE"
+E_OFFLEAF_HANDLE = "E_OFFLEAF_HANDLE"
+E_REGISTRY_PARSE_ERROR = "E_REGISTRY_PARSE_ERROR"
+E_REGISTRY_SOURCE_MISSING = "E_REGISTRY_SOURCE_MISSING"
+E_STALE_LEDGER = "E_STALE_LEDGER"
+
 HANDLE_PATTERN = r"[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*"
 HANDLE_RE = re.compile(rf"^{HANDLE_PATTERN}$")
 TRACE_RE = re.compile(rf"@reqtrace\s+({HANDLE_PATTERN})\b")
@@ -230,10 +245,10 @@ def scan_repository(root: Path, config: dict[str, Any]) -> ScanResult:
             marker_count = len(nonlegacy_current) + len(legacy_matches)
             location = f"{relative_path}:{line_number}"
             if marker_count > 1:
-                errors.append(f"E_MULTIPLE_MARKERS_ON_LINE {location}")
+                errors.append(f"{E_MULTIPLE_MARKERS_ON_LINE} {location}")
                 continue
             if legacy_matches and nonlegacy_current:
-                errors.append(f"E_AMBIGUOUS_MARKER {location}")
+                errors.append(f"{E_AMBIGUOUS_MARKER} {location}")
                 continue
             if legacy_matches:
                 legacy = legacy_matches[0]
@@ -260,12 +275,12 @@ def short_id(path: str, line: int, length: int = 4) -> str:
 def records_from_occurrences(
     occurrences: Iterable[Occurrence], id_length: int
 ) -> tuple[list[LedgerRecord], list[str]]:
-    ordered = sorted(occurrences, key=lambda item: (item.handle, item.path, item.line))
+    items = list(occurrences)
     length = id_length
     while length <= MAX_ID_LENGTH:
         records = [
             LedgerRecord(item.handle, short_id(item.path, item.line, length), item.path, item.line, item.kind)
-            for item in ordered
+            for item in items
         ]
         ids_by_handle: dict[str, set[str]] = defaultdict(set)
         collision = False
@@ -277,9 +292,10 @@ def records_from_occurrences(
         if not collision:
             return records, []
         length += 1
-    return [], [f"E_ID_COLLISION unable to disambiguate occurrence IDs at {MAX_ID_LENGTH} hex characters"]
+    return [], [f"{E_ID_COLLISION} unable to disambiguate occurrence IDs at {MAX_ID_LENGTH} hex characters"]
 
 def write_ledger(path: Path, records: Iterable[LedgerRecord]) -> None:
+    # The ledger writer owns canonical ordering for generated JSONL bytes.
     ordered = sorted(records, key=lambda item: (item.handle, item.path, item.line))
     content = "".join(
         json.dumps(record.as_json(), separators=(", ", ": ")) + "\n" for record in ordered
@@ -315,14 +331,14 @@ def read_ledger(path: Path) -> tuple[list[LedgerRecord], list[str]]:
         try:
             value = json.loads(raw_line)
         except json.JSONDecodeError as error:
-            errors.append(f"E_LEDGER_PARSE {path.as_posix()}:{line_number}: {error.msg}")
+            errors.append(f"{E_LEDGER_PARSE} {path.as_posix()}:{line_number}: {error.msg}")
             continue
         if not isinstance(value, dict):
-            errors.append(f"E_LEDGER_PARSE {path.as_posix()}:{line_number}: record must be an object")
+            errors.append(f"{E_LEDGER_PARSE} {path.as_posix()}:{line_number}: record must be an object")
             continue
         record = ledger_record_from_json(value)
         if record is None:
-            errors.append(f"E_LEDGER_PARSE {path.as_posix()}:{line_number}: invalid record schema")
+            errors.append(f"{E_LEDGER_PARSE} {path.as_posix()}:{line_number}: invalid record schema")
             continue
         records.append(record)
     return records, errors
@@ -331,9 +347,11 @@ def ledger_record_from_json(value: dict[str, Any]) -> LedgerRecord | None:
     required = ("handle", "id", "path", "line", "kind")
     if not set(required) <= set(value):
         return None
-    handle, record_id, path, line, kind = (
-        value["handle"], value["id"], value["path"], value["line"], value["kind"]
-    )
+    handle = value["handle"]
+    record_id = value["id"]
+    path = value["path"]
+    line = value["line"]
+    kind = value["kind"]
     if not isinstance(handle, str) or not HANDLE_RE.fullmatch(handle):
         return None
     if not isinstance(record_id, str) or not re.fullmatch(r"[0-9a-f]+", record_id):
@@ -356,12 +374,12 @@ def parse_registry_text(path: Path, content: str) -> tuple[list[dict[str, Any]],
             value = json.loads(raw_line)
         except json.JSONDecodeError as error:
             errors.append(
-                f"E_REGISTRY_PARSE_ERROR {path.as_posix()}:{line_number}: {error.msg}"
+                f"{E_REGISTRY_PARSE_ERROR} {path.as_posix()}:{line_number}: {error.msg}"
             )
             continue
         if not isinstance(value, dict):
             errors.append(
-                f"E_REGISTRY_PARSE_ERROR {path.as_posix()}:{line_number}: record must be an object"
+                f"{E_REGISTRY_PARSE_ERROR} {path.as_posix()}:{line_number}: record must be an object"
             )
             continue
         handle = value.get("handle")
@@ -375,7 +393,7 @@ def parse_registry_text(path: Path, content: str) -> tuple[list[dict[str, Any]],
             or handle in handles
         ):
             errors.append(
-                f"E_REGISTRY_PARSE_ERROR {path.as_posix()}:{line_number}: invalid record schema"
+                f"{E_REGISTRY_PARSE_ERROR} {path.as_posix()}:{line_number}: invalid record schema"
             )
             continue
         handles.add(handle)
@@ -434,7 +452,7 @@ def command_init(root: Path, _: argparse.Namespace) -> int:
     registry_path = project_path(root, config["registry_path"])
     existing = [path.relative_to(root).as_posix() for path in (config_path, ledger_path, registry_path) if path.exists()]
     if existing:
-        print(f"E_INIT_EXISTS refusing to overwrite: {', '.join(existing)}", file=sys.stderr)
+        print(f"{E_INIT_EXISTS} refusing to overwrite: {', '.join(existing)}", file=sys.stderr)
         return 2
     written: list[Path] = []
     created_dirs: list[Path] = []
@@ -469,7 +487,7 @@ def command_init(root: Path, _: argparse.Namespace) -> int:
 def command_register(root: Path, config: dict[str, Any], args: argparse.Namespace) -> int:
     handle = args.handle
     if not isinstance(handle, str) or not HANDLE_RE.fullmatch(handle):
-        print(f"E_INVALID_HANDLE: {handle!r} must match {HANDLE_PATTERN}", file=sys.stderr)
+        print(f"{E_INVALID_HANDLE}: {handle!r} must match {HANDLE_PATTERN}", file=sys.stderr)
         return 1
 
     registry_path = project_path(root, config["registry_path"])
@@ -478,12 +496,12 @@ def command_register(root: Path, config: dict[str, Any], args: argparse.Namespac
         print_messages(errors)
         return 2
     if handle in {entry["handle"] for entry in registry}:
-        print(f"E_DUPLICATE_HANDLE: {handle} is already registered", file=sys.stderr)
+        print(f"{E_DUPLICATE_HANDLE}: {handle} is already registered", file=sys.stderr)
         return 1
 
     source = args.source
     if source is not None and not project_path(root, source).is_file():
-        print(f"E_REGISTRY_SOURCE_MISSING: {source} not found", file=sys.stderr)
+        print(f"{E_REGISTRY_SOURCE_MISSING}: {source} not found", file=sys.stderr)
         return 1
 
     entry: dict[str, str] = {"handle": handle, "type": args.type or "unknown"}
@@ -512,6 +530,7 @@ def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -
         else:
             committed_identities = {record.source_identity() for record in committed}
             records = [record for record in records if record.source_identity() not in committed_identities]
+    output_records = sorted(records, key=lambda record: (record.handle, record.path, record.line))
     if output_format == "json":
         committed_by_source = {record.source_identity(): record for record in committed}
         print(
@@ -528,7 +547,7 @@ def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -
                         if record.source_identity() in committed_by_source
                         else None,
                     }
-                    for record in records
+                    for record in output_records
                 ],
                 indent=2,
             )
@@ -536,7 +555,7 @@ def command_scan(root: Path, config: dict[str, Any], args: argparse.Namespace) -
         print_messages(errors)
         return 0
     grouped: dict[str, list[LedgerRecord]] = defaultdict(list)
-    for record in records:
+    for record in output_records:
         grouped[record.handle].append(record)
     if not grouped:
         total = len(scan.occurrences) + len(scan.legacy_occurrences)
@@ -574,7 +593,7 @@ def command_generate(root: Path, config: dict[str, Any], args: argparse.Namespac
     if scan.legacy_occurrences:
         for legacy in scan.legacy_occurrences:
             print(
-                f"warning: E_LEGACY_FORM {legacy.path}:{legacy.line} "
+                f"warning: {E_LEGACY_FORM} {legacy.path}:{legacy.line} "
                 f"{legacy.handle}/{legacy.ordinal}",
                 file=sys.stderr,
             )
@@ -654,7 +673,7 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
         for message in errors:
             emit_error(message)
     for legacy in scan.legacy_occurrences:
-        message = f"E_LEGACY_FORM {legacy.path}:{legacy.line} {legacy.handle}/{legacy.ordinal}"
+        message = f"{E_LEGACY_FORM} {legacy.path}:{legacy.line} {legacy.handle}/{legacy.ordinal}"
         if config["legacy_form"] == "reject":
             emit_error(message)
         else:
@@ -668,7 +687,7 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
         if sorted(record.identity() for record in generated) != sorted(
             record.identity() for record in committed
         ):
-            emit_error("E_STALE_LEDGER committed ledger differs from a fresh scan")
+            emit_error(f"{E_STALE_LEDGER} committed ledger differs from a fresh scan")
             if sorted(record.source_identity() for record in generated) == sorted(
                 record.source_identity() for record in committed
             ):
@@ -681,7 +700,7 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
             prefix = handle_prefix(record.handle)
             if prefix != leaf and (prefix in config["doc_hierarchy"] or prefix == "V2M"):
                 emit_error(
-                    f"E_OFFLEAF_HANDLE {record.handle} at {record.path}:{record.line} "
+                    f"{E_OFFLEAF_HANDLE} {record.handle} at {record.path}:{record.line} "
                     f"(expected leaf: {leaf})"
                 )
         records_by_file: dict[str, list[LedgerRecord]] = defaultdict(list)
@@ -702,15 +721,14 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
                 handles = sorted({record.handle for record in block})
                 if len(handles) > 1:
                     emit_error(
-                        f"E_MULTI_HANDLE_EVIDENCE {file_path}:{block[0].line}-{block[-1].line} "
+                        f"{E_MULTI_HANDLE_EVIDENCE} {file_path}:{block[0].line}-{block[-1].line} "
                         f"has {len(handles)} handles: {', '.join(handles)}"
                     )
 
     requested_level = getattr(args, "strict", None)
     strict_level = requested_level if requested_level is not None else config["strict_level"]
-    registry_for_summary: list[dict[str, Any]] | None = None
+    registry_for_summary, registry_errors = read_registry(project_path(root, config["registry_path"]))
     if strict_level == "full":
-        registry_for_summary, registry_errors = read_registry(project_path(root, config["registry_path"]))
         if registry_errors:
             for message in registry_errors:
                 emit_error(message)
@@ -719,14 +737,14 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
             for handle in sorted({record.handle for record in generated}):
                 entry = registry_by_handle.get(handle)
                 if entry is None or entry.get("type") in {None, "unknown"}:
-                    emit_error(f"E_HANDLE_NOT_REGISTERED {handle}")
+                    emit_error(f"{E_HANDLE_NOT_REGISTERED} {handle}")
             for entry in registry_for_summary:
                 source = entry.get("source")
                 if source is None:
                     continue
                 if not source:
                     emit_error(
-                        f"E_REGISTRY_SOURCE_MISSING {entry['handle']} "
+                        f"{E_REGISTRY_SOURCE_MISSING} {entry['handle']} "
                         f"(source: blank)"
                     )
                     continue
@@ -734,13 +752,13 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
                     source_path = project_path(root, source)
                 except ReqtraceError as error:
                     emit_error(
-                        f"E_REGISTRY_SOURCE_MISSING {entry['handle']} "
+                        f"{E_REGISTRY_SOURCE_MISSING} {entry['handle']} "
                         f"(source: {source} invalid: {error})"
                     )
                     continue
                 if not source_path.exists():
                     emit_error(
-                        f"E_REGISTRY_SOURCE_MISSING {entry['handle']} "
+                        f"{E_REGISTRY_SOURCE_MISSING} {entry['handle']} "
                         f"(source: {source} not found)"
                     )
     output_format = getattr(args, "format", "text")
@@ -749,14 +767,13 @@ def command_check(root: Path, config: dict[str, Any], args: argparse.Namespace) 
             print(json.dumps({"status": "fail", "errors": error_codes}))
         else:
             print(f"REQTRACE FAIL checks={len(error_codes)}", file=sys.stderr)
+            invocation = Path(sys.argv[0]).name
             print(
-                "fix: python scripts/reqtrace.py generate && python scripts/reqtrace.py check --strict",
+                f"fix: python {invocation} generate && python {invocation} check --strict",
                 file=sys.stderr,
             )
         return 1
 
-    if registry_for_summary is None:
-        registry_for_summary, _ = read_registry(project_path(root, config["registry_path"]))
     buckets, _ = coverage_data(registry_for_summary, committed)
     summary = coverage_summary(buckets)
     if output_format == "json":
@@ -940,7 +957,7 @@ def command_migrate(root: Path, config: dict[str, Any], args: argparse.Namespace
     if errors or migrated_scan.legacy_occurrences:
         print_messages(errors)
         for occurrence in migrated_scan.legacy_occurrences:
-            print(f"E_LEGACY_FORM {occurrence.path}:{occurrence.line}", file=sys.stderr)
+            print(f"{E_LEGACY_FORM} {occurrence.path}:{occurrence.line}", file=sys.stderr)
         return 2
     write_ledger(project_path(root, config["ledger_path"]), records)
     print_messages(warnings)
@@ -990,7 +1007,7 @@ def main(argv: list[str] | None = None) -> int:
             except ReqtraceError:
                 return command_init(root, args)
             print(
-                f"E_INIT_EXISTS already inside a Reqtrace project rooted at {existing_root.as_posix()}",
+                f"{E_INIT_EXISTS} already inside a Reqtrace project rooted at {existing_root.as_posix()}",
                 file=sys.stderr,
             )
             return 2

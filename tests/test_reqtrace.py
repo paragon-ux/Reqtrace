@@ -769,6 +769,26 @@ class ReqtraceCliTests(unittest.TestCase):
                 [reqtrace.Occurrence("ADR-0012", "documentation/guide.md", 1, "documentation")],
             )
 
+    def test_md_file_in_unmapped_directory_is_not_scanned(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(root / "examples" / "guide.md", f"{MARKER} ADR-0012\n")
+            scan = reqtrace.scan_repository(root, self.config(root))
+            self.assertEqual(scan.occurrences, [])
+            self.assertEqual(scan.errors, [])
+
+    def test_md_file_in_mapped_directory_is_scanned(self) -> None:
+        with self.make_root() as directory:
+            root = Path(directory)
+            self.write(root / "examples" / "guide.md", f"{MARKER} ADR-0012\n")
+            config = self.config(root)
+            config["role_map"]["examples/**"] = "documentation"
+            scan = reqtrace.scan_repository(root, config)
+            self.assertEqual(scan.errors, [])
+            self.assertEqual(len(scan.occurrences), 1)
+            self.assertEqual(scan.occurrences[0].handle, "ADR-0012")
+            self.assertEqual(scan.occurrences[0].kind, "documentation")
+
     def test_check_uses_configured_full_policy_without_flag(self) -> None:
         with self.make_root() as directory:
             root = Path(directory)

@@ -202,13 +202,17 @@ class StabilizeTests(unittest.TestCase):
             config = self.config(root)
             stdout = io.StringIO()
             stderr = io.StringIO()
-            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            with (
+                patch.object(sys, "argv", ["reqtrace"]),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
                 self.assertEqual(
                     reqtrace.command_check(root, config, SimpleNamespace(strict="ledger", format="text")), 1
                 )
             self.assertIn("E_STALE_LEDGER", stderr.getvalue())
             self.assertIn("REQTRACE FAIL checks=1", stderr.getvalue())
-            self.assertIn("fix: python scripts/reqtrace.py generate", stderr.getvalue())
+            self.assertIn("fix: python reqtrace generate && python reqtrace check --strict", stderr.getvalue())
             stdout = io.StringIO()
             stderr = io.StringIO()
             with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
