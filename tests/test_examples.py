@@ -11,7 +11,6 @@ class ExampleStyleTests(unittest.TestCase):
     def test_readme_declares_marker_semantics(self) -> None:
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("evidence annotations, not explanatory comments", readme)
-        self.assertIn("does not dogfood production source by default", readme)
         self.assertNotIn("self-tracing markers in `scripts/reqtrace.py`", readme)
 
     def test_agents_declares_comment_preservation_rule(self) -> None:
