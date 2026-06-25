@@ -1,3 +1,4 @@
+{"handle": "AUTH-SESSION-ROTATION", "id": "0ecc", "path": "docs/schema.md", "line": 114, "kind": "documentation"}
 {"handle": "AUTH-SESSION-ROTATION", "id": "25ab", "path": "examples/refresh-token/src/revocation.js", "line": 2, "kind": "implementation"}
 {"handle": "AUTH-SESSION-ROTATION", "id": "51de", "path": "examples/refresh-token/src/rotation.js", "line": 2, "kind": "implementation"}
 {"handle": "AUTH-SESSION-ROTATION", "id": "fb2d", "path": "examples/refresh-token/src/validation.js", "line": 2, "kind": "implementation"}
