@@ -10,6 +10,8 @@ Add one marker near source or test evidence. Use a handle that already exists up
 @reqtrace <HANDLE>
 ```
 
+The marker is evidence annotation; it does not replace explanatory comments where they are needed.
+
 Generate the ledger, then validate freshness:
 
 ```bash

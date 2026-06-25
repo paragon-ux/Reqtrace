@@ -6,7 +6,7 @@ Reqtrace is a grep-native convention for tracing implementation evidence to an e
 
 Reqtrace starts after that handle already exists. It does not create, rename, split, supersede, or interpret upstream artifacts.
 
-Current release: [`v2.1.0`](https://github.com/paragon-ux/Reqtrace/releases/tag/v2.1.0) ("Verified").
+Current release: [`v2.1.5`](https://github.com/paragon-ux/Reqtrace/releases/tag/v2.1.5).
 
 ## One Marker, One Record
 
@@ -19,6 +19,12 @@ Place one marker near source, test, or documentation evidence:
 The validator derives the repo-relative path, line, role, and short occurrence ID. There are no manual ordinals or `@file` placeholders.
 
 The canonical ledger is `docs/trace-ledger.jsonl`: a generated, sorted JSON Lines file. `docs/handle-registry.jsonl` lists known upstream handles and their types. Both remain grep-friendly files.
+
+## Marker Semantics
+
+Reqtrace markers are evidence annotations, not explanatory comments. Use `@reqtrace <HANDLE>` to connect code, tests, docs, and artifacts to upstream handles. Do not use markers as a substitute for comments that explain intent, invariants, tradeoffs, surprising logic, security assumptions, or maintenance hazards. When adding markers to existing code, preserve existing explanatory comments. If a code path needed a comment before annotation, it still needs one after.
+
+Reqtrace does not dogfood production source by default. The project uses markers in calibration fixtures and examples to test and demonstrate the evidence convention. Production code should only carry `@reqtrace` markers when tied to meaningful upstream requirements. Calibration fixtures are scanner/report/check fixtures, not production annotation style guides.
 
 ## Workflow
 

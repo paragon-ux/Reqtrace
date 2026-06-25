@@ -9,8 +9,9 @@ Use the repository's CLI as the source of truth; do not copy its grammar or ledg
 
 1. Read `AGENTS.md` and the relevant upstream artifact or task context.
 2. Run `python scripts/reqtrace.py scan` to inspect nearby existing evidence, then inspect `docs/handle-registry.jsonl` for the intended handle.
-3. Suggest one `@reqtrace <HANDLE>` comment per relevant source or test evidence line. Do not add an ordinal, `@file`, role-specific hook, claim, parent field, wiki link, or JSON reference.
-4. Explain why each suggested location is evidence, and ask for human confirmation before writing annotations.
-5. After confirmation, add the comments and tell the caller to use the audit skill or run `generate`, `render`, and `check --strict`.
+3. If target logic is nontrivial and lacks explanatory comments, note that an explanatory comment may be needed alongside the marker. Do not treat the marker as a substitute.
+4. Suggest one `@reqtrace <HANDLE>` marker per relevant source or test evidence line. Do not add an ordinal, `@file`, role-specific hook, claim, parent field, wiki link, or JSON reference.
+5. Explain why each suggested location is evidence, and ask for human confirmation before writing annotations.
+6. After confirmation, add the markers and tell the caller to use the audit skill or run `generate`, `render`, and `check --strict`.
 
 Never invent, rename, or silently register a handle. If the handle is missing, ambiguous, or not supplied by an upstream source, stop and surface that question.
