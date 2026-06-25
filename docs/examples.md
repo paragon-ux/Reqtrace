@@ -10,7 +10,7 @@ the full generate → render → check workflow for a single handle.
 
 `examples/calibration/` contains seven self-contained mini-projects. Each
 proves one specific claim about Reqtrace's behaviour. These fixtures are not
-production annotation style guides; see [`examples/calibration/README.md`](../examples/calibration/README.md)
+production annotation style guides; see `examples/calibration/README.md`
 for the disclaimer. Run them all at once:
 
 ```bash
