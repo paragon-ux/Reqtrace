@@ -20,6 +20,12 @@ The validator derives the repo-relative path, line, role, and short occurrence I
 
 The canonical ledger is `docs/trace-ledger.jsonl`: a generated, sorted JSON Lines file. `docs/handle-registry.jsonl` lists known upstream handles and their types. Both remain grep-friendly files.
 
+## Marker Semantics
+
+Reqtrace markers are evidence annotations, not explanatory comments. Use `@reqtrace <HANDLE>` to connect code, tests, docs, and artifacts to upstream handles. Do not use markers as a substitute for comments that explain intent, invariants, tradeoffs, surprising logic, security assumptions, or maintenance hazards. When adding markers to existing code, preserve existing explanatory comments. If a code path needed a comment before annotation, it still needs one after.
+
+Reqtrace does not dogfood production source by default. The project uses markers in calibration fixtures and examples to test and demonstrate the evidence convention. Production code should only carry `@reqtrace` markers when tied to meaningful upstream requirements. Calibration fixtures are scanner/report/check fixtures, not production annotation style guides.
+
 ## Workflow
 
 1. Add a marker using an existing registered handle.
