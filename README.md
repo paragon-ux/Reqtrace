@@ -6,7 +6,7 @@ Reqtrace is a grep-native convention for tracing implementation evidence to an e
 
 Reqtrace starts after that handle already exists. It does not create, rename, split, supersede, or interpret upstream artifacts.
 
-Current release: [`v2.1.6`](https://github.com/paragon-ux/Reqtrace/releases/tag/v2.1.6).
+Current release: [`v2.1.7`](https://github.com/paragon-ux/Reqtrace/releases/tag/v2.1.7).
 
 ## One Marker, One Record
 
@@ -70,7 +70,7 @@ Use `report --format json` for machine-readable coverage. A handle is full when 
 
 ## What Reqtrace Delegates
 
-Reqtrace v2.1.6 preserves the evidence convention. It does not replace every
+Reqtrace v2.1.7 preserves the evidence convention. It does not replace every
 surrounding workflow.
 
 - **Search / command compression:** use `grep`, `rg`, or RTK.
