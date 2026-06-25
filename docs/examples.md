@@ -9,16 +9,18 @@ the full generate → render → check workflow for a single handle.
 ## Calibration Fixtures
 
 `examples/calibration/` contains seven self-contained mini-projects. Each
-proves one specific claim about Reqtrace's behaviour. Run them all at once:
+proves one specific claim about Reqtrace's behaviour. These fixtures are not
+production annotation style guides; see [`examples/calibration/README.md`](../examples/calibration/README.md)
+for the disclaimer. Run them all at once:
 
 ```bash
 python examples/calibration/run.py
 ```
 
-Expected output on a correctly installed v2.1:
+Expected output on a correctly installed v2.1.5:
 
 ```
-Reqtrace v2.1 calibration
+Reqtrace v2.1.5 calibration
 =========================
 01-full-coverage           PASS
 02-partial-impl-only       PASS

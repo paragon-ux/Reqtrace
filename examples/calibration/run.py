@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Reqtrace v2.1 calibration runner.
+Reqtrace v2.1.5 calibration runner.
 
 Usage:
     python examples/calibration/run.py
@@ -144,7 +144,7 @@ def run_scenario(name: str, verify: ScenarioCheck) -> str | None:
 
 
 def main() -> int:
-    print("Reqtrace v2.1 calibration")
+    print("Reqtrace v2.1.5 calibration")
     print("=========================")
     failures: list[tuple[str, str]] = []
     for name, verify in SCENARIOS:
