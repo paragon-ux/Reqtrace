@@ -100,16 +100,34 @@ Failure:
 ```json
 {
   "status": "fail",
-  "errors": [
-    "E_TRACE_DRIFT"
-  ]
+  "errors": ["E_STALE_LEDGER"]
 }
 ```
+
+## Register Output (`register`)
+
+`register` emits human-readable confirmation to stdout. It is not a
+JSON contract; it is intended for operator and agent confirmation only.
+
+```text
+REQTRACE REGISTERED AUTH-LOGIN
+marker:   &#64;reqtrace AUTH-LOGIN
+registry: docs/handle-registry.jsonl
+```
+
+On failure, `register` prints a machine-readable error code to stderr
+and exits with code 1:
+
+| Error | Condition |
+| --- | --- |
+| `E_INVALID_HANDLE` | Handle does not match the required grammar. |
+| `E_DUPLICATE_HANDLE` | Handle is already present in the registry. |
+| `E_REGISTRY_SOURCE_MISSING` | `--source` path does not resolve to a real file. |
 
 ## Exit Codes
 
 | Exit code | Meaning |
 | --- | --- |
 | 0 | Command succeeded; `check` passed or a generated file was written. |
-| 1 | A validation failed, such as `check` drift, a duplicate handle, or a missing source. |
+| 1 | A validation failed, such as stale ledger check output, a duplicate handle, or a missing source. |
 | 2 | Tool/configuration error, malformed project state, unreadable configured file, invalid registry/ledger parse, or other non-validation execution failure. |
