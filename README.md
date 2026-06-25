@@ -1,3 +1,5 @@
+[![CI](https://github.com/paragon-ux/Reqtrace/actions/workflows/reqtrace.yml/badge.svg)](https://github.com/paragon-ux/Reqtrace/actions/workflows/reqtrace.yml)
+
 # Reqtrace
 
 Reqtrace is a grep-native convention for tracing implementation evidence to an existing upstream handle. A handle may belong to a requirement, ADR, security control, policy, compliance rule, or test specification.
